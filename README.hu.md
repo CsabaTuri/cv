@@ -235,7 +235,7 @@ DB_USER=chat DB_PASSWORD=chat ADMIN_TOKEN=ci-admin-token \
 | `tests/content.test.mjs` | a szövegkatalógus: egyedi kulcsok, JSON szerializálás, és hogy a frontend minden kért kulcsa létezik - a megfelelő hookkal |
 | `tests/assets.test.mjs` | a PWA (manifest mezők, ikonok a deklarált méretekkel, a worker handlerei), az nginx szabályok, és a compose invariánsok, amiket ez a stack már elrontott: nincs `latest`, nincs profile a rebuild helperen, a gateway a subnetjén belül, a VAPID kulcsok mindkét szolgáltatáshoz eljutnak, `.env.example` szinkronban |
 
-A [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) hat jobot futtat
+A [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) hét jobot futtat
 minden pull requestnél és a `main`-re való pushnál:
 
 | Job | Mit csinál |
@@ -244,12 +244,42 @@ minden pull requestnél és a `main`-re való pushnál:
 | `site` | typecheck + statikus export, benne a PWA fájlok |
 | `api` | a fenti készlet `mysql:8.4` service ellen, Node 20-on és 22-n (egyszerre 54 teszt) |
 | `e2e` | megépíti az exportot, telepíti a Chromiumot, és lefuttatja a Playwright készletet ugyanazon a `mysql:8.4` service-en (18 teszt) |
-| `summary` | összegyűjti az `api` és `e2e` jelentéseit, és a teljes készletet egy összefoglalóba írja: **72 teszt** egy táblázatban a futás oldalán |
+| `summary` | összegyűjti az `api` és `e2e` jelentéseit, a teljes készletet egy összefoglalóba írja (**72 teszt** egy táblázatban), és legenerálja az Allure dashboardot, amit GitHub Pagesre publikál, ha az elérhető |
 | `docker` | mindkét overlay, a fail-fast őr `.env` nélkül, `docker compose build`, és `nginx -t` a megépített image-ben |
+| `publish` | csak `main`-en, és csak ha minden fenti job zöld: a compose fájlokon keresztül megépíti a három image-et, és feltolja a `ghcr.io`-ra |
 
 Minden jobnak saját összefoglalója van, ezért egy job száma még nem a teljes kép:
 a `summary` az, amit először érdemes megnézni — és ez az oka annak is, hogy a unit
 tesztek nem számolódnak kétszer (a két Node verzió ugyanazt az 54-et futtatja).
+
+### GitHubon buildelt image-ek
+
+A `publish` job úgyis megépíti az image-eket, így meg is tartja őket: commitonként
+egy változtathatatlan tag, a GitHub container registryre feltolva.
+
+```
+ghcr.io/csabaturi/cv-web:sha-1a2b3c4
+ghcr.io/csabaturi/cv-chat-backend:sha-1a2b3c4
+ghcr.io/csabaturi/cv-deployer:sha-1a2b3c4
+```
+
+Egy host ezután építés helyett húzhat: állítsd ugyanezt a taget a `.env`-jében, majd
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+A repository privát, és a package-ek is azok, ezért a *húzáshoz* bejelentkezés kell
+azon a hoston (személyes token `read:packages` joggal):
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u CsabaTuri --password-stdin
+```
+
+A helyi buildet ez nem érinti: a `docker compose build` pontosan ugyanilyen nevű
+image-et készít (`ghcr.io/csabaturi/cv-web:${IMAGE_TAG_CV}`), csak épp nem hagyja el
+a gépet. Az admin panel Build gombja ugyanígy működik tovább — az építéshez sosem
+kell a registry.
 
 ### Az eredmények megjelenítése
 
@@ -281,6 +311,33 @@ node .github/scripts/test-summary.mjs test-results/junit.xml --title Local
 ```
 
 A `test-results/` könyvtár git-ignore alatt van.
+
+### Az Allure dashboard
+
+Ugyanezeket az eredményeket az [Allure](https://allurereport.org) is rendereli, ami
+olyat ad, amit egy táblázat nem: suite-fa, idővonal, trend a futások között, és egy
+bukás képernyőképe vagy trace-e a hibát adó teszt mellett.
+
+* **Artifact** - `allure-report`, 14 napig: csomagold ki, és nyisd meg az
+  `index.html`-t (statikus oldal, nem kell szerver).
+* **Online** - a `summary` job publikálja GitHub Pagesre, és a futás oldala
+  belinkel rá (`https://<owner>.github.io/cv/`). Ehhez be kell kapcsolni a Pages-t
+  a repositoryban (*Settings → Pages → Source: GitHub Actions*), privát repónál
+  pedig csak a Pages-t tartalmazó csomag adja — ha nincs, a job jelzi, és az
+  artifact akkor is ott van.
+
+Lokálisan egy paranccsal megépül a jelentés mindkét készletre:
+
+```bash
+npm run allure:local     # e2e + unit + konverzió + generálás
+npm run allure:open      # kiszolgálja, kövesd a kiírt URL-t
+```
+
+A Playwright az Allure resultokat magától írja; a unit készlet a
+`tests/allure-from-junit.mjs`-en megy át, ami a suite által már megtermelt JUnit
+XML-t fordítja Allure resultokká — így mindkettő egy dashboardra kerül. Az
+`allure:local`-ban a sorrend számít: a Playwright a futás elején kiüríti a
+`test-results/`-ot.
 
 ## Biztonsági intézkedések
 
@@ -366,6 +423,28 @@ ugyanazzal a paranccsal veszi át, amint maga is újraépül. A második parancs
 addig működik, amíg az előző image a hoston van — ne pruneld ki. Az *adatbázis*
 visszaállítása dumpból történik: a séma `CREATE TABLE IF NOT EXISTS`-szel jön
 létre, ezért egy régebbi image egy újabb séma ellen szintén restore-t igényel.
+
+### Frissítés egy paranccsal
+
+A [`cv-update.sh`](./cv-update.sh) annak a gépnek szól, amelyik a stacket futtatja:
+követi a `main`-t, a három `IMAGE_TAG_*` értéket erre a commitra állítja,
+bejelentkezik a registrybe, lehúzza az image-eket, újraindítja a stacket — majd
+ellenőrzi is, amit kiírt.
+
+```bash
+export GHCR_TOKEN=...     # read:packages jogú token (ha a docker már be van jelentkezve, kihagyható)
+./cv-update.sh            # vagy ./cv-update.sh --no-pull, ha a host maga épít
+```
+
+Ez az oka annak, hogy egy elavult frontend nem tud észrevétlen maradni: a szkript a
+forrásfát is frissíti (`git pull --ff-only`, és piszkos checkoutnál nem megy
+tovább), így a deployolt compose fájlok ahhoz az image-hez illenek, amit lehúz. A
+végén füst-tesztet futtat a `/`, `/sw.js`, `/manifest.webmanifest` és `/api/health`
+útvonalakra — a `/sw.js` 404 azt jelenti, hogy még egy régi cv image szolgál ki,
+és pontosan ez az, amitől az offline shell és az értesítések nem működnek. Az
+egész viselkedést a [`tests/update-script.test.mjs`](./tests/update-script.test.mjs)
+fedi le, ami egy sandbox repositoryban, stubolt `docker` és `curl` binárisokkal
+futtatja a szkriptet.
 
 ## Dokumentáció
 

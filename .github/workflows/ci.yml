@@ -9,8 +9,11 @@
 #            backend and a real MySQL, with nothing mocked
 #   docker - the compose files and the images themselves, plus the guard that
 #            the stack refuses to start without its secrets
+#   publish- the images, built once the tests are green, pushed to the GitHub
+#            container registry so a host can pull them instead of building
 #   summary- collects the reports of the jobs above into one summary, so the
-#            run page shows the whole suite in one place
+#            run page shows the whole suite in one place, and renders the Allure
+#            dashboard from them (published to GitHub Pages when it is enabled)
 #
 # The tests live in tests/ and need no dependencies: `node --test` with the
 # standard library only. Run them locally with:
@@ -299,6 +302,7 @@ jobs:
           path: |
             test-results/
             playwright-report/
+            allure-results/
           retention-days: 14
           if-no-files-found: warn
 
@@ -317,6 +321,66 @@ jobs:
           } > test-results/comment.md
           bash .github/scripts/pr-comment.sh cv-ci-report:e2e test-results/comment.md
 
+  # Everything tested and green, so the images that were just built are worth
+  # keeping: one immutable tag per commit, pushed to ghcr.io. The stack on the
+  # host can then pull instead of building (set IMAGE_TAG_* in its .env to the
+  # published tag); nothing here changes how a local build works.
+  publish:
+    name: Publish the images
+    needs: [lint, site, api, e2e, docker]
+    # Only from main: a pull request must never publish anything.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The same environment the docker job builds with. The tags are thrown
+      # away below: what is published is the commit, never a floating tag.
+      - name: Compose environment for CI
+        run: |
+          cp .env.example .env
+          sed -i 's/^MYSQL_PASSWORD=$/MYSQL_PASSWORD=ci-password/' .env
+          sed -i 's/^MYSQL_ROOT_PASSWORD=$/MYSQL_ROOT_PASSWORD=ci-root-password/' .env
+          sed -i 's/^ADMIN_TOKEN=$/ADMIN_TOKEN=ci-admin-token/' .env
+          sed -i 's/^IMAGE_TAG_CV=.*/IMAGE_TAG_CV=ci/' .env
+          sed -i 's/^IMAGE_TAG_CHAT_BACKEND=.*/IMAGE_TAG_CHAT_BACKEND=ci/' .env
+          sed -i 's/^IMAGE_TAG_DEPLOYER=.*/IMAGE_TAG_DEPLOYER=ci/' .env
+
+      - name: Log in to the container registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      # Built through the compose files, so the build arguments (the analytics
+      # token, the Dockerfiles, the contexts) are the ones the stack uses.
+      - name: Build the images
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+
+      - name: Push them with the tag of this commit
+        run: |
+          # Must match the registry prefix in docker-compose.yml.
+          registry="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
+          tag="sha-$(git rev-parse --short=7 HEAD)"
+
+          for name in cv-web cv-chat-backend cv-deployer; do
+            docker tag "${registry}/${name}:ci" "${registry}/${name}:${tag}"
+            docker push "${registry}/${name}:${tag}"
+          done
+
+          {
+            printf '## 📦 Published images\n\n'
+            printf 'The whole suite passed, so this commit is available as:\n\n'
+            for name in cv-web cv-chat-backend cv-deployer; do
+              printf -- '- `%s/%s:%s`\n' "$registry" "$name" "$tag"
+            done
+            printf '\nPull them on a host by setting the three `IMAGE_TAG_*` values in its `.env` to `%s` and running `docker compose pull`.\n' "$tag"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # The reports of the jobs above, collected into one summary. The unit suite
   # runs on two Node versions, so the Node 22 report is the one that is joined:
   # counting the same tests twice would only make the total confusing.
@@ -325,7 +389,12 @@ jobs:
     needs: [api, e2e]
     if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # Publishing the Allure report to GitHub Pages needs both.
+      pages: write
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -333,6 +402,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      # The Allure CLI is a Java program, so make sure there is one.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install the tooling
+        run: npm ci
 
       - uses: actions/download-artifact@v4
         continue-on-error: true
@@ -359,6 +439,84 @@ jobs:
 
           node .github/scripts/test-summary.mjs "${reports[@]}" \
             --title "All tests (unit on Node 22 + end to end)"
+
+      # One Allure dashboard for everything: the unit suite is converted from the
+      # same JUnit XML, the Playwright results were written by the e2e job.
+      # The unit suite is folded into the same results folder the e2e job wrote
+      # its Playwright results into, so one dashboard covers everything.
+      - name: Allure report
+        if: always()
+        run: |
+          # The Playwright results come out of the e2e artifact; the unit results
+          # are converted into the very same folder below.
+          if [ -d reports/e2e/allure-results ]; then
+            mkdir -p allure-results
+            cp -a reports/e2e/allure-results/. allure-results/
+          fi
+
+          mapfile -t unit < <(find reports/unit -type f -name '*junit.xml' | sort)
+          if [ "${#unit[@]}" -gt 0 ]; then
+            node tests/allure-from-junit.mjs "${unit[@]}" \
+              --parent "Unit tests (Node 22)" --out allure-results
+          else
+            echo "no unit report was uploaded"
+          fi
+
+          if [ -d allure-results ]; then
+            npm run allure:generate
+          else
+            echo "nothing to render - writing a placeholder report instead"
+            mkdir -p allure-report
+            printf '<!doctype html><meta charset="utf-8"><title>No report</title><p>No test results were uploaded.\n' \
+              > allure-report/index.html
+          fi
+
+      - name: Allure report (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: allure-report/
+          retention-days: 14
+          if-no-files-found: warn
+
+      # Browsable without downloading anything. Pages has to be enabled for the
+      # repository (Settings -> Pages -> Source: GitHub Actions) and, on a
+      # private repository, only plans with Pages included provide it - if it is
+      # not available, the steps below say so and the artifact is still there.
+      - name: Prepare GitHub Pages
+        id: pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload the report for Pages
+        if: steps.pages.outcome == 'success'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: allure-report
+
+      - name: Publish the report
+        id: deploy
+        if: steps.pages.outcome == 'success'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+
+      - name: Where to find the reports
+        if: always()
+        run: |
+          {
+            printf '\n### Reports\n\n'
+            printf -- '- Summary: above, on this page\n'
+            printf -- '- Allure dashboard: the `allure-report` artifact, unzip and open `index.html`\n'
+            if [ -n "${{ steps.deploy.outputs.page_url }}" ]; then
+              printf -- '- Allure dashboard online: %s\n' "${{ steps.deploy.outputs.page_url }}"
+            else
+              printf -- '- Allure dashboard online: not published (GitHub Pages is not enabled for this repository)\n'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
   docker:
     name: Compose files and images

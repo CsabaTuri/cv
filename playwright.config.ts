@@ -27,21 +27,24 @@ export default defineConfig({
   // The export can only handle one build at a time, and every test works on its
   // own conversation, so a couple of workers is enough to keep it quick.
   fullyParallel: true,
-  workers: process.env.CI ? 2 : undefined,
+  // A handful of workers, not one per test: the tests share the site, the API and
+  // the database, and a wide local run once timed out on a page assertion under
+  // the load of 14 parallel browsers.
+  workers: process.env.CI ? 2 : 4,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   timeout: 30_000,
   expect: { timeout: 10_000 },
 
-  // The second reporter writes the same JUnit XML the unit suite produces, so
-  // .github/scripts/test-summary.mjs can report on both in the same way.
-  reporter: process.env.CI
-    ? [
-        ['list'],
-        ['junit', { outputFile: 'test-results/playwright-junit.xml' }],
-        ['html', { open: 'never' }],
-      ]
-    : [['list'], ['html', { open: 'never' }]],
+  // Every run writes all four: the log, the standalone HTML report, the JUnit
+  // XML that .github/scripts/test-summary.mjs turns into the run summary, and
+  // the Allure results `npm run allure` renders into the browsable dashboard.
+  reporter: [
+    ['list'],
+    ['html', { open: 'never' }],
+    ['junit', { outputFile: 'test-results/playwright-junit.xml' }],
+    ['allure-playwright', { resultsDir: 'allure-results', detail: true, suiteTitle: true }],
+  ],
 
   use: {
     baseURL: `http://127.0.0.1:${SITE_PORT}`,

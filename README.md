@@ -235,7 +235,7 @@ DB_USER=chat DB_PASSWORD=chat ADMIN_TOKEN=ci-admin-token \
 | `tests/content.test.mjs` | the copy catalogue: unique keys, JSON serialisation, and that every key the frontend asks for exists - with the matching hook |
 | `tests/assets.test.mjs` | the PWA (manifest fields, icons on disk with the declared sizes, the worker's handlers), the nginx rules, and the compose invariants this stack got wrong before: no `latest`, no profile on the rebuild helper, the gateway inside its subnet, the VAPID keys reaching both services, `.env.example` in sync |
 
-[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs six jobs on every
+[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs seven jobs on every
 pull request and on pushes to `main`:
 
 | Job | What it does |
@@ -244,12 +244,42 @@ pull request and on pushes to `main`:
 | `site` | typecheck + static export, including the PWA files |
 | `api` | the suite above against a `mysql:8.4` service, on Node 20 and 22 (54 tests each) |
 | `e2e` | builds the export, installs Chromium and runs the Playwright suite against the same `mysql:8.4` service (18 tests) |
-| `summary` | collects the reports of `api` and `e2e` and writes the whole suite into one summary: **72 tests** in a single table on the run page |
+| `summary` | collects the reports of `api` and `e2e`, writes the whole suite into one summary (**72 tests** in a single table) and renders the Allure dashboard, published to GitHub Pages when it is available |
 | `docker` | both overlays, the fail-fast guard without a `.env`, `docker compose build`, and `nginx -t` inside the built image |
+| `publish` | only on `main`, and only once every job above is green: builds the three images through the compose files and pushes them to `ghcr.io` |
 
 Every job has its own summary, so a single job's numbers are never the whole
 story: `summary` is the one to look at first, and it is the reason the unit tests
 are not counted twice (the two Node versions run the same 54).
+
+### Images built on GitHub
+
+The `publish` job builds the images anyway, so it keeps them: one immutable tag
+per commit, pushed to the GitHub container registry.
+
+```
+ghcr.io/csabaturi/cv-web:sha-1a2b3c4
+ghcr.io/csabaturi/cv-chat-backend:sha-1a2b3c4
+ghcr.io/csabaturi/cv-deployer:sha-1a2b3c4
+```
+
+A host can then pull instead of building: set the same tag in its `.env` and
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+The repository is private, and the packages are too, so *pulling* needs a login
+on that host (a personal access token with `read:packages`):
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u CsabaTuri --password-stdin
+```
+
+A local build is unaffected: `docker compose build` produces exactly the same
+image name (`ghcr.io/csabaturi/cv-web:${IMAGE_TAG_CV}`), it simply never leaves
+the machine. The build button in the admin panel keeps working for the same
+reason - building never needs the registry.
 
 ### Reading the results
 
@@ -281,6 +311,32 @@ node .github/scripts/test-summary.mjs test-results/junit.xml --title Local
 ```
 
 `test-results/` is ignored by git.
+
+### The Allure dashboard
+
+The same results are also rendered by [Allure](https://allurereport.org), which
+gives what a table cannot: the suite tree, a timeline, the trend across runs, and
+the screenshot or trace of a failure attached to the test that produced it.
+
+* **Artifact** - `allure-report`, kept for 14 days: unzip it and open `index.html`
+  (a static page, no server needed).
+* **Online** - the `summary` job publishes it to GitHub Pages, and the run page
+  then links to it (`https://<owner>.github.io/cv/`). That needs Pages to be
+  enabled for the repository (*Settings → Pages → Source: GitHub Actions*), and on
+  a private repository only a plan that includes Pages provides it - if it is not
+  available the job says so and the artifact is still there.
+
+Locally, one command builds the report for both suites:
+
+```bash
+npm run allure:local     # e2e + unit + convert + generate
+npm run allure:open      # serve it, then follow the printed URL
+```
+
+`npm run e2e` writes the Playwright Allure results itself; the unit suite goes
+through `tests/allure-from-junit.mjs`, which turns the JUnit XML the suite already
+produces into Allure results - so both land in one dashboard. The order inside
+`allure:local` matters: Playwright empties `test-results/` at the start of a run.
 
 ## Security measures
 
@@ -368,6 +424,27 @@ second command only works while the previous image is still on the host — do n
 prune it away. Rollback of the *database* is a restore from a dump: the schema
 is created with `CREATE TABLE IF NOT EXISTS`, so an older image against a newer
 schema needs a restore as well.
+
+### Updating a host in one command
+
+[`cv-update.sh`](./cv-update.sh) is for the machine that runs the stack: it
+follows `main`, points the three `IMAGE_TAG_*` values at that commit, logs in to
+the registry, pulls the images, restarts the stack - and then checks what it just
+deployed.
+
+```bash
+export GHCR_TOKEN=...     # a token with read:packages (skip it if docker is already logged in)
+./cv-update.sh            # or ./cv-update.sh --no-pull, for a host that builds its own images
+```
+
+It is the reason a stale frontend cannot hide: the script updates the working
+tree (`git pull --ff-only`, and it refuses to continue on a dirty checkout), so the
+compose files it deploys match the images it pulls. It finishes with a smoke check
+of `/`, `/sw.js`, `/manifest.webmanifest` and `/api/health` - a 404 on `/sw.js`
+means an old cv image is still serving, which is what leaves the offline shell and
+the notifications off. The whole behaviour is covered by
+[`tests/update-script.test.mjs`](./tests/update-script.test.mjs), which runs the
+script in a sandbox repository with stubbed `docker` and `curl` binaries.
 
 ## Documentation
 

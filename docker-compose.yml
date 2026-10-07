@@ -40,7 +40,12 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN: ${NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN:-}
-    image: cv-web:${IMAGE_TAG_CV:?IMAGE_TAG_CV is missing from .env}
+    # The CI builds and publishes this image to GitHub Container Registry (see
+    # .github/workflows/ci.yml), and a local `docker compose build` produces the
+    # very same name - so IMAGE_TAG_CV alone decides between a local build and a
+    # published one. Pulling a published tag needs a `docker login ghcr.io` on
+    # the host; building never does.
+    image: ghcr.io/csabaturi/cv-web:${IMAGE_TAG_CV:?IMAGE_TAG_CV is missing from .env}
     container_name: cv
     restart: unless-stopped
     depends_on:
@@ -91,7 +96,7 @@ services:
     build:
       context: ./chat-backend
       dockerfile: Dockerfile
-    image: cv-chat-backend:${IMAGE_TAG_CHAT_BACKEND:?IMAGE_TAG_CHAT_BACKEND is missing from .env}
+    image: ghcr.io/csabaturi/cv-chat-backend:${IMAGE_TAG_CHAT_BACKEND:?IMAGE_TAG_CHAT_BACKEND is missing from .env}
     container_name: chat_backend
     restart: unless-stopped
     depends_on:
@@ -298,7 +303,7 @@ services:
     build:
       context: ./deployer
       dockerfile: Dockerfile
-    image: cv-deployer:${IMAGE_TAG_DEPLOYER:?IMAGE_TAG_DEPLOYER is missing from .env}
+    image: ghcr.io/csabaturi/cv-deployer:${IMAGE_TAG_DEPLOYER:?IMAGE_TAG_DEPLOYER is missing from .env}
     container_name: cv_deployer
     restart: unless-stopped
     depends_on:
