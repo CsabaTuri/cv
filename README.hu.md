@@ -18,11 +18,11 @@ böngésző ──▶ cv (nginx-unprivileged, uid 101)
 
 | Szolgáltatás | Image | Publikált port | Hálózatok | Megjegyzés |
 | --- | --- | --- | --- | --- |
-| `cv` | `cv-web:${IMAGE_TAG}` (nginx-unprivileged, uid 101) | `3036:8080` a `SITE_BIND`-en (alap: `0.0.0.0`) | `app` | Statikus oldal + `/api` reverse proxy. Read-only rootfs, minden capability eldobva. |
-| `chat-backend` | `cv-chat-backend:${IMAGE_TAG}` (Node 20, `nodejs` user) | `3112:3000` | `app`, `data` | Chat + admin API. Read-only rootfs, minden capability eldobva. |
+| `cv` | `cv-web:${IMAGE_TAG_CV}` (nginx-unprivileged, uid 101) | `3036:8080` a `SITE_BIND`-en (alap: `0.0.0.0`) | `app` | Statikus oldal + `/api` reverse proxy. Read-only rootfs, minden capability eldobva. |
+| `chat-backend` | `cv-chat-backend:${IMAGE_TAG_CHAT_BACKEND}` (Node 20, `nodejs` user) | `3112:3000` | `app`, `data` | Chat + admin API. Read-only rootfs, minden capability eldobva. |
 | `mysql` | `mysql:8.4` | nincs | `data` (internal) | Üzenetek, beszélgetések, oldal-szövegek. Read-only rootfs, deny-by-default capability-k. |
 | `phpmyadmin` | `phpmyadmin:5-apache` | `8081:80` | `data`, `pma` | Adatbázis UI az üzemeltetőnek. |
-| `deployer` | `cv-deployer:${IMAGE_TAG}` (Node 20 + Docker CLI) | nincs | `app` | Opcionális rebuild helper (compose profile: `deploy`). Övé a Docker socket; lásd [Újrabuildelés](#újrabuildelés-egy-gombnyomásra-admin-panel). |
+| `deployer` | `cv-deployer:${IMAGE_TAG_DEPLOYER}` (Node 20 + Docker CLI) | nincs | `app` | Opcionális rebuild helper (compose profile: `deploy`). Övé a Docker socket; lásd [Újrabuildelés](#újrabuildelés-egy-gombnyomásra-admin-panel). |
 
 A `data` hálózat `internal: true`: a MySQL-nek nincs internet-egress-e, és a
 hostról/LAN-ról sem érhető el. A `pma` hálózat csak a phpMyAdmin publikált
@@ -126,7 +126,7 @@ A dokumentált sablon: [`.env.example`](./.env.example).
 | `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD` | Adatbázis és alkalmazás credentialek (kötelező). |
 | `ADMIN_TOKEN` | Az admin API-t védi, és ezzel lépsz be a `/admin` oldalra (kötelező). |
 | `TZ` | Időzóna a MySQL/phpMyAdmin és a backend számára. |
-| `IMAGE_TAG` | **Kötelező**: ezzel a taggel épül és fut minden image. Csak konkrét verzió, soha nem `latest`; lásd *Visszaállás*. |
+| `IMAGE_TAG_CV`, `IMAGE_TAG_CHAT_BACKEND`, `IMAGE_TAG_DEPLOYER` | **Kötelező**: image-enként egy konkrét verzió, soha nem `latest`; lásd *Visszaállás*. |
 | `SITE_BIND`, `API_BIND`, `PHPMYADMIN_BIND` | Mely host interfészekre kötődjenek a portok. |
 | `NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN` | Opcionális analytics token, build időben kerül a bundle-be. |
 | `DEPLOY_ENABLED` | Engedélyezi, hogy a rebuild helper cselekedjen (alap: `false`). |
@@ -136,7 +136,7 @@ A dokumentált sablon: [`.env.example`](./.env.example).
 
 A compose **fail-fast**: hiányzó kötelező érték esetén (`${VAR:?}`) nem indul
 el gyenge jelszóval, és verzió nélkül sem — próbáld ki üres `ADMIN_TOKEN`-nel,
-vagy `IMAGE_TAG` nélkül a `docker compose config` paranccsal.
+vagy valamelyik image tag nélkül a `docker compose config` paranccsal.
 
 ## Biztonsági intézkedések
 
@@ -208,18 +208,20 @@ docker compose exec mysql cat /var/lib/mysql/slow.log
 Visszaállás (rollback):
 
 ```bash
-# kiadás: emeld az IMAGE_TAG-et a .env-ben, majd build
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# kiadás: emeld annak az image-nek a verzióját a .env-ben, amit módosítottál, majd build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d --build
 
 # visszaállás: tedd vissza az előző verziót a .env-ben, majd indítás (build nélkül)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d
 ```
 
-A második parancs csak azért működik, mert a tag konkrét verzió: a compose
-fájlok elutasítják a `latest`-et (és tag nélkül el sem indulnak), az előző image
-pedig ott marad a hoston — ne pruneld ki. Az *adatbázis* visszaállítása dumpból
-történik: a séma `CREATE TABLE IF NOT EXISTS`-szel jön létre, ezért egy régebbi
-image egy újabb séma ellen szintén restore-t igényel.
+Minden image-nek saját verziója van, ezért az oldal és az API külön adható ki.
+Mindkét parancsban szándékosan ott a `--profile deploy`: a rebuild helper
+továbbadja a tageket az általa indított buildnek, viszont az új értékeket csak
+akkor veszi át, ha maga a helper is újraépül. A második parancs csak addig
+működik, amíg az előző image a hoston van — ne pruneld ki. Az *adatbázis*
+visszaállítása dumpból történik: a séma `CREATE TABLE IF NOT EXISTS`-szel jön
+létre, ezért egy régebbi image egy újabb séma ellen szintén restore-t igényel.
 
 ## Dokumentáció
 

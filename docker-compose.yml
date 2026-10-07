@@ -40,7 +40,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN: ${NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN:-}
-    image: cv-web:${IMAGE_TAG:?IMAGE_TAG is missing from .env (never use `latest`)}
+    image: cv-web:${IMAGE_TAG_CV:?IMAGE_TAG_CV is missing from .env}
     container_name: cv
     restart: unless-stopped
     depends_on:
@@ -91,7 +91,7 @@ services:
     build:
       context: ./chat-backend
       dockerfile: Dockerfile
-    image: cv-chat-backend:${IMAGE_TAG:?IMAGE_TAG is missing from .env (never use `latest`)}
+    image: cv-chat-backend:${IMAGE_TAG_CHAT_BACKEND:?IMAGE_TAG_CHAT_BACKEND is missing from .env}
     container_name: chat_backend
     restart: unless-stopped
     depends_on:
@@ -292,7 +292,7 @@ services:
     build:
       context: ./deployer
       dockerfile: Dockerfile
-    image: cv-deployer:${IMAGE_TAG:?IMAGE_TAG is missing from .env (never use `latest`)}
+    image: cv-deployer:${IMAGE_TAG_DEPLOYER:?IMAGE_TAG_DEPLOYER is missing from .env}
     container_name: cv_deployer
     restart: unless-stopped
     profiles:
@@ -327,7 +327,9 @@ services:
       MYSQL_USER: ${MYSQL_USER:?MYSQL_USER is missing from .env}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is missing from .env}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is missing from .env}
-      IMAGE_TAG: ${IMAGE_TAG:?IMAGE_TAG is missing from .env}
+      IMAGE_TAG_CV: ${IMAGE_TAG_CV:?IMAGE_TAG_CV is missing from .env}
+      IMAGE_TAG_CHAT_BACKEND: ${IMAGE_TAG_CHAT_BACKEND:?IMAGE_TAG_CHAT_BACKEND is missing from .env}
+      IMAGE_TAG_DEPLOYER: ${IMAGE_TAG_DEPLOYER:?IMAGE_TAG_DEPLOYER is missing from .env}
       SITE_BIND: ${SITE_BIND:-0.0.0.0}
       API_BIND: ${API_BIND:-127.0.0.1}
       PHPMYADMIN_BIND: ${PHPMYADMIN_BIND:-127.0.0.1}

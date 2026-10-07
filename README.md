@@ -18,11 +18,11 @@ browser ──▶ cv (nginx-unprivileged, uid 101)
 
 | Service | Image | Published | Networks | Notes |
 | --- | --- | --- | --- | --- |
-| `cv` | `cv-web:${IMAGE_TAG}` (nginx-unprivileged, uid 101) | `3036:8080` on `SITE_BIND` (default `0.0.0.0`) | `app` | Static site + `/api` reverse proxy. Read-only rootfs, all capabilities dropped. |
-| `chat-backend` | `cv-chat-backend:${IMAGE_TAG}` (Node 20, user `nodejs`) | `3112:3000` | `app`, `data` | Chat + admin API. Read-only rootfs, all capabilities dropped. |
+| `cv` | `cv-web:${IMAGE_TAG_CV}` (nginx-unprivileged, uid 101) | `3036:8080` on `SITE_BIND` (default `0.0.0.0`) | `app` | Static site + `/api` reverse proxy. Read-only rootfs, all capabilities dropped. |
+| `chat-backend` | `cv-chat-backend:${IMAGE_TAG_CHAT_BACKEND}` (Node 20, user `nodejs`) | `3112:3000` | `app`, `data` | Chat + admin API. Read-only rootfs, all capabilities dropped. |
 | `mysql` | `mysql:8.4` | none | `data` (internal) | Messages, conversations, site copy. Read-only rootfs, capabilities denied by default. |
 | `phpmyadmin` | `phpmyadmin:5-apache` | `8081:80` | `data`, `pma` | Database UI for the operator. |
-| `deployer` | `cv-deployer:${IMAGE_TAG}` (Node 20 + Docker CLI) | none | `app` | Opt-in rebuild helper (compose profile `deploy`). Holds the Docker socket; see [One-click rebuild](#one-click-rebuild-admin-panel). |
+| `deployer` | `cv-deployer:${IMAGE_TAG_DEPLOYER}` (Node 20 + Docker CLI) | none | `app` | Opt-in rebuild helper (compose profile `deploy`). Holds the Docker socket; see [One-click rebuild](#one-click-rebuild-admin-panel). |
 
 `data` is `internal: true`: MySQL has no internet egress and cannot be reached
 from the host or the LAN. `pma` carries nothing but phpMyAdmin's published port
@@ -127,7 +127,7 @@ See [`.env.example`](./.env.example) for the documented template.
 | `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD` | Database and application credentials (required). |
 | `ADMIN_TOKEN` | Guards the admin API and logs into `/admin` (required). |
 | `TZ` | Time zone for MySQL/phpMyAdmin and the backend. |
-| `IMAGE_TAG` | **Required**: the tag every image is built and run with. A concrete version only, never `latest`; see *Rollback* below. |
+| `IMAGE_TAG_CV`, `IMAGE_TAG_CHAT_BACKEND`, `IMAGE_TAG_DEPLOYER` | **Required**: one concrete version per image, never `latest`; see *Rollback* below. |
 | `SITE_BIND`, `API_BIND`, `PHPMYADMIN_BIND` | Host interfaces the ports are bound to. |
 | `NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN` | Optional analytics token, baked in at build time. |
 | `DEPLOY_ENABLED` | Allows the rebuild helper to act (`false` by default). |
@@ -137,8 +137,8 @@ See [`.env.example`](./.env.example) for the documented template.
 
 Compose fails fast when a required value is missing (`${VAR:?}`), so the stack
 can neither start with an empty password nor without a version — see the error
-when running `docker compose config` with an empty `ADMIN_TOKEN`, or without
-`IMAGE_TAG`.
+when running `docker compose config` with an empty `ADMIN_TOKEN`, or with any of
+the image tags left out.
 
 ## Security measures
 
@@ -212,17 +212,19 @@ docker compose exec mysql cat /var/lib/mysql/slow.log
 Rollback:
 
 ```bash
-# release: bump IMAGE_TAG in .env, then rebuild
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# release: bump the version of the image(s) you changed in .env, then rebuild
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d --build
 
 # rollback: put the previous version back in .env, then start (no rebuild)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d
 ```
 
-The second command only works because the tag is a concrete version: the compose
-files refuse `latest` (and refuse to start without a tag at all), and the
-previous image is still on the host — do not prune it away. Rollback of the
-*database* is a restore from a dump: the schema is created with
+Each image has its own version, which is why the site and the API can be
+released independently. Both commands include `--profile deploy` on purpose: the
+rebuild helper passes the tags on to the build it triggers, and it only picks up
+new values when the helper itself is recreated. The second command only works
+while the previous image is still on the host — do not prune it away. Rollback
+of the *database* is a restore from a dump: the schema is created with
 `CREATE TABLE IF NOT EXISTS`, so an older image against a newer schema needs a
 restore as well.
 
