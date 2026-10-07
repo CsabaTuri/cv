@@ -1,7 +1,9 @@
 # CV — Túri Csaba
 
+[Magyar verzió](./README.hu.md) · **English**
+
 Modern, static (SSG) CV website built with Next.js (App Router),
-TypeScript, Tailwind CSS and Framer Motion. English only.
+TypeScript, Tailwind CSS and Framer Motion. The site itself is Hungarian.
 
 Nothing is hardcoded in the components: **every text of the site comes from the
 database** (`GET /api/content`, editable on the `/admin` page under *Szövegek*).

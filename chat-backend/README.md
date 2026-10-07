@@ -1,5 +1,7 @@
 # chat-backend
 
+[Magyar verzió](./README.hu.md) · **English**
+
 Chat API for the CV site: the visitor widget on one side, the admin inbox on
 the other, MySQL in between. No external service and no AI.
 

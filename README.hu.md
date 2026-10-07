@@ -133,5 +133,7 @@ cseréjekor ezt tartsd meg.
 
 ## Dokumentáció
 
-* [cv/README.md](./cv/README.md) — statikus önéletrajz oldal, oldalak, build.
-* [chat-backend/README.md](./chat-backend/README.md) — API végpontok, séma.
+* [cv/README.md](./cv/README.md) — statikus önéletrajz oldal (angolul).
+* [cv/README.hu.md](./cv/README.hu.md) — statikus önéletrajz oldal magyarul.
+* [chat-backend/README.md](./chat-backend/README.md) — API végpontok, séma (angolul).
+* [chat-backend/README.hu.md](./chat-backend/README.hu.md) — API végpontok, séma magyarul.

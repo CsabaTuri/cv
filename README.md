@@ -134,5 +134,7 @@ compose files.
 
 ## Documentation
 
-* [cv/README.md](./cv/README.md) — static CV site, pages, build.
-* [chat-backend/README.md](./chat-backend/README.md) — API endpoints, schema.
+* [cv/README.md](./cv/README.md) — static CV site, pages, build (English).
+* [cv/README.hu.md](./cv/README.hu.md) — ugyanaz magyarul.
+* [chat-backend/README.md](./chat-backend/README.md) — API endpoints, schema (English).
+* [chat-backend/README.hu.md](./chat-backend/README.hu.md) — ugyanaz magyarul.
