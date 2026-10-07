@@ -207,6 +207,33 @@ statikus export, benne a PWA fájlok), a fenti készlet `mysql:8.4` service elle
 Node 20-on és 22-n, valamint az image-ek (mindkét overlay, a fail-fast őr `.env`
 nélkül, `docker compose build`, és `nginx -t` a megépített image-ben).
 
+### Az eredmények megjelenítése
+
+A teszt lépés a napló mellett a `node --test` beépített JUnit riportját is
+elkéri, a [`.github/scripts/test-summary.mjs`](./.github/scripts/test-summary.mjs)
+pedig ebből markdown jelentést készít, ami három helyen jelenik meg - egyikhez
+sem kell extra eszköz vagy külső action:
+
+* **Futás összefoglaló** - a jelentés a `$GITHUB_STEP_SUMMARY`-ba kerül, így a
+  job oldalának tetején látszik: összesítés, táblázat suite-onként, és minden
+  hibánál egy lenyitható blokk az üzenettel.
+* **Artifact** - a `test-results-node-<verzió>` tartalmazza a JUnit XML-t és a
+  markdown jelentést, 14 napig letölthető a futás oldaláról.
+* **Pull request komment** - pull requestnél ugyanez a markdown megy kommentként,
+  és minden pushnál ugyanaz a komment frissül, nem lesz belőle egy sorozat.
+  Forknál a token csak olvasásra jó, ezért az a lépés ott elhasalhat.
+
+Ugyanez a jelentés lokálisan, a fenti parancs után:
+
+```bash
+mkdir -p test-results
+node --test --test-reporter=junit \
+  --test-reporter-destination=test-results/junit.xml tests/*.test.mjs
+node .github/scripts/test-summary.mjs test-results/junit.xml --title Local
+```
+
+A `test-results/` könyvtár git-ignore alatt van.
+
 ## Biztonsági intézkedések
 
 * Nincs sehol default credential; hiányzó érték megállítja a deployt.

@@ -207,6 +207,33 @@ including the PWA files), the suite above against a `mysql:8.4` service on Node
 20 and 22, and the images (both overlays, the fail-fast guard without a `.env`,
 `docker compose build`, and `nginx -t` inside the built image).
 
+### Reading the results
+
+The test step asks `node --test` for its JUnit report as well as its log, and
+[`.github/scripts/test-summary.mjs`](./.github/scripts/test-summary.mjs) turns
+that XML into markdown, which shows up in three places - none of them needs
+extra tooling or a third-party action:
+
+* **Run summary** - the report is written to `$GITHUB_STEP_SUMMARY`, so it is at
+  the top of the job page: totals, a per-suite table and a collapsible block with
+  the message of every failure.
+* **Artifact** - `test-results-node-<version>` holds the JUnit XML and the
+  markdown itself, kept for 14 days and downloadable from the run page.
+* **Pull request comment** - on a pull request the same markdown is posted as a
+  comment and updated in place on every push, instead of one comment per run.
+  On a fork the token is read-only, so that step is allowed to fail there.
+
+The same report locally, on top of the command above:
+
+```bash
+mkdir -p test-results
+node --test --test-reporter=junit \
+  --test-reporter-destination=test-results/junit.xml tests/*.test.mjs
+node .github/scripts/test-summary.mjs test-results/junit.xml --title Local
+```
+
+`test-results/` is ignored by git.
+
 ## Security measures
 
 * No default credentials anywhere; missing values abort the deploy.

@@ -14,6 +14,13 @@
 #   DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=cv_chat_test \
 #   DB_USER=chat DB_PASSWORD=chat ADMIN_TOKEN=ci-admin-token \
 #     node --test tests/*.test.mjs
+#
+# Results are reported three ways, all of them without extra tooling:
+#   * the run summary (markdown written to $GITHUB_STEP_SUMMARY)
+#   * a downloadable artifact (the JUnit XML and that markdown)
+#   * a comment on the pull request, updated in place on every push
+# .github/scripts/test-summary.mjs builds the markdown out of the JUnit XML that
+# `node --test` writes with its built-in reporter.
 # ---------------------------------------------------------------------------
 name: CI
 
@@ -69,6 +76,11 @@ jobs:
     name: API (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      # Only for the report comment; forks get a read-only token, and the step
+      # is allowed to fail there instead of failing the job.
+      pull-requests: write
     strategy:
       fail-fast: false
       matrix:
@@ -118,9 +130,51 @@ jobs:
           node --check chat-backend/content.js
           node --check deployer/deployer.js
           node --check cv/public/sw.js
+          node --check .github/scripts/test-summary.mjs
 
       - name: Tests (API, content catalogue, assets, compose guards)
-        run: node --test tests/*.test.mjs
+        run: |
+          mkdir -p test-results
+          node --test \
+            --test-reporter=spec --test-reporter-destination=stdout \
+            --test-reporter=junit --test-reporter-destination=test-results/junit.xml \
+            tests/*.test.mjs
+
+      # Everything below runs even when the tests failed - that is the point of
+      # a report. None of these steps may fail the job either: the test step
+      # above already decides the outcome.
+      - name: Test report (run summary + pull request body)
+        if: always()
+        run: |
+          node .github/scripts/test-summary.mjs test-results/junit.xml \
+            --title "API (Node ${{ matrix.node }})" \
+            --out test-results/summary.md
+
+      - name: Test report (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-node-${{ matrix.node }}
+          path: test-results/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Test report (pull request comment)
+        if: always() && github.event_name == 'pull_request' && matrix.node == '22'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.number }}
+        run: |
+          {
+            cat test-results/summary.md 2>/dev/null \
+              || printf '## 🧪 Test report\n\n⚠️ The report could not be generated - see the job log.\n'
+            printf '\n[Full log and artifacts](%s/%s/actions/runs/%s)\n' \
+              "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+          } > test-results/comment.md
+          # One comment per pull request, updated in place instead of one per push.
+          gh pr comment "$PR" --edit-last --body-file test-results/comment.md \
+            || gh pr comment "$PR" --body-file test-results/comment.md
 
   docker:
     name: Compose files and images
