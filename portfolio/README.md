@@ -18,6 +18,12 @@ answered.
 | `/` | Portfolio with the chat widget (bottom right). |
 | `/admin/` | Admin panel with two tabs: *Üzenetek* (conversation list, thread, reply box) and *Szövegek* (the site copy editor). Asks for the `ADMIN_TOKEN` from `.env` (kept in `localStorage`). Not indexable. |
 
+## Stack
+
+This service is part of the repository-level stack — see
+[../README.md](../README.md) for the services, hardening and operating
+instructions (ports, backup, phpMyAdmin access).
+
 ## Local development
 
 ```bash

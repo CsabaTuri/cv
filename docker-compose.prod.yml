@@ -1,0 +1,67 @@
+# =============================================================================
+# Portfolio + custom chat stack - PRODUCTION overlay
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# This is the enforcement layer on top of docker-compose.yml:
+#   * the admin API and phpMyAdmin are pinned to the host loopback interface, so
+#     a loosened API_BIND / PHPMYADMIN_BIND in .env cannot expose them
+#   * shorter log rotation with compression, longer shutdown grace periods and
+#     explicit open-file limits
+#
+# Do not combine it with docker-compose.override.yml (that is the dev overlay).
+# =============================================================================
+
+services:
+
+  portfolio:
+    read_only: true
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+        compress: "true"
+
+  chat-backend:
+    read_only: true
+    ports:
+      # Admin API: loopback only, whatever .env says.
+      - "127.0.0.1:3112:3000"
+    stop_grace_period: 15s
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 8192
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+        compress: "true"
+
+  mysql:
+    # InnoDB needs time to flush on shutdown.
+    stop_grace_period: 60s
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 16384
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+        compress: "true"
+
+  phpmyadmin:
+    ports:
+      # Database UI: loopback only, whatever .env says.
+      - "127.0.0.1:8081:80"
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+        compress: "true"

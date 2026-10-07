@@ -1,0 +1,30 @@
+# =============================================================================
+# Portfolio + custom chat stack - DEVELOPMENT overlay
+#
+# Applied automatically by `docker compose up -d` (when no -f flag is given).
+# It only adds local conveniences; the hardening of docker-compose.yml stays
+# active. Nothing here is used in production.
+#
+# Production is started explicitly without this file:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# =============================================================================
+
+services:
+
+  portfolio:
+    # Faster feedback while iterating (production uses the base values).
+    healthcheck:
+      interval: 10s
+      start_period: 5s
+
+  chat-backend:
+    ports:
+      # In development the API is reachable from the LAN; production pins it to
+      # the host loopback interface.
+      - "${API_BIND:-0.0.0.0}:3112:3000"
+
+  phpmyadmin:
+    ports:
+      # In development phpMyAdmin is reachable from the LAN; production pins it
+      # to the host loopback interface.
+      - "${PHPMYADMIN_BIND:-0.0.0.0}:8081:80"

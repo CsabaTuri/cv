@@ -1,104 +1,258 @@
+# =============================================================================
+# Portfolio + custom chat stack - BASE file (dev and prod share it)
+#
+#   dev  : docker compose up -d
+#          (base + docker-compose.override.yml, which is applied automatically)
+#   prod : docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# The hardening below is always active; docker-compose.prod.yml adds the
+# production enforcement (loopback-only admin ports, tighter logs, limits).
+#
+# Hardening notes:
+#   * no secret has a default here - a missing .env value fails the deploy
+#     (`${VAR:?}`) instead of silently starting with a weak password
+#   * the database lives on an `internal: true` network: it has no internet
+#     egress and is not reachable from the host/LAN, only from the services
+#     that share that network
+#   * containers run with `no-new-privileges`; the ones that do not need Linux
+#     capabilities (nginx, the Node backend) drop all of them and run with a
+#     read-only root filesystem plus small tmpfs mounts
+#   * every published port is bound explicitly and MySQL publishes none
+#   * CPU/memory limits, pids limits and log rotation are set per service
+# =============================================================================
+
+name: cv
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
 
-  # -------------------------------------------------------------------------
-  # portfolio - static portfolio website (Next.js SSG, served by nginx).
-  # Also serves /admin (the chat inbox) from the same static export.
-  # Host port 3036.
-  # -------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
+  # portfolio - static site (Next.js SSG) + admin UI, served by nginx.
+  # ---------------------------------------------------------------------------
   portfolio:
     build:
       context: ./portfolio
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN: ${NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN:-}
+    image: cv-portfolio:latest
     container_name: portfolio
     restart: unless-stopped
+    depends_on:
+      chat-backend:
+        condition: service_started
     ports:
-      - "3036:80"
+      - "${SITE_BIND:-0.0.0.0}:3036:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+      - /var/cache/nginx:rw,noexec,nosuid,size=32m
+      - /var/run:rw,noexec,nosuid,size=8m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    init: true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+          pids: 128
+    logging: *logging
     networks:
-      exitnode-bridge:
-        ipv4_address: 172.31.255.2
+      - app
 
-  # -------------------------------------------------------------------------
-  # chat-backend - custom chat API + admin API.
-  # Stores the conversations in MySQL, serves the visitor widget and the
-  # /admin inbox. The site reaches it through the nginx /api/ proxy.
-  # Host port 3112.
-  # -------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
+  # chat-backend - chat API (visitor widget) + admin API (inbox, site copy).
+  # ---------------------------------------------------------------------------
   chat-backend:
-    build: ./chat-backend
+    build:
+      context: ./chat-backend
+      dockerfile: Dockerfile
+    image: cv-chat-backend:latest
     container_name: chat_backend
-    restart: always
-    ports:
-      - "3112:3000"
-    environment:
-      - PORT=3000
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_NAME=${MYSQL_DATABASE}
-      - DB_USER=${MYSQL_USER}
-      - DB_PASSWORD=${MYSQL_PASSWORD}
-      - ADMIN_TOKEN=${ADMIN_TOKEN}
+    restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: ${MYSQL_DATABASE:?MYSQL_DATABASE is missing from .env}
+      DB_USER: ${MYSQL_USER:?MYSQL_USER is missing from .env}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is missing from .env}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?ADMIN_TOKEN is missing from .env}
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    init: true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 192M
+          pids: 128
+    logging: *logging
     networks:
-      exitnode-bridge:
-        ipv4_address: 172.31.255.4
+      - app
+      - data
 
-  # -------------------------------------------------------------------------
-  # mysql - chat message store (no host port, internal only).
-  # -------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
+  # mysql - chat messages + site copy. Internal network only, no published port.
+  # ---------------------------------------------------------------------------
   mysql:
     image: mysql:8.4
     container_name: chat_mysql
-    restart: always
+    restart: unless-stopped
     environment:
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_USER=${MYSQL_USER}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-      - TZ=${TZ:-Europe/Budapest}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is missing from .env}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE is missing from .env}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER is missing from .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is missing from .env}
+      TZ: ${TZ:-Europe/Budapest}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      # No file import/export through SQL statements.
+      - --local-infile=OFF
+      - --max-connections=100
+      - --max-allowed-packet=16M
     volumes:
       - mysql-data:/var/lib/mysql
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      # The entrypoint needs CHOWN/DAC_OVERRIDE/SETUID/SETGID to prepare the
+      # data directory and drop to the mysql user; the rest is unnecessary.
+      - NET_RAW
+      - SETPCAP
+      - AUDIT_WRITE
+      - NET_BIND_SERVICE
+      - MKNOD
+    # Give InnoDB time to shut down cleanly.
+    stop_grace_period: 30s
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      # Without credentials: mysqladmin answers even when the login is denied,
+      # so this only checks that the server accepts connections.
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
       interval: 10s
       timeout: 5s
       retries: 12
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 768M
+          pids: 256
+    logging: *logging
     networks:
-      exitnode-bridge:
-        ipv4_address: 172.31.255.5
+      - data
 
-  # -------------------------------------------------------------------------
-  # phpmyadmin - web UI for the chat database.
-  # Login with MYSQL_USER / MYSQL_PASSWORD (or MYSQL_ROOT_PASSWORD) from .env.
-  # Host port 8081 (LAN only; do not expose it publicly).
-  # -------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
+  # phpmyadmin - database UI for the operator. Bound to the host loopback by
+  # default; set PHPMYADMIN_BIND in .env to expose it on the LAN.
+  # ---------------------------------------------------------------------------
   phpmyadmin:
     image: phpmyadmin:5-apache
     container_name: chat_phpmyadmin
-    restart: always
-    ports:
-      - "${PHPMYADMIN_PORT:-8081}:80"
-    environment:
-      - PMA_HOST=mysql
-      - PMA_PORT=3306
-      - UPLOAD_LIMIT=64M
+    restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: "3306"
+      # Never allow connecting to an arbitrary (attacker supplied) host.
+      PMA_ARBITRARY: "0"
+      UPLOAD_LIMIT: 64M
+      MAX_EXECUTION_TIME: "300"
+      TZ: ${TZ:-Europe/Budapest}
+    # No read-only rootfs here on purpose: entrypoint.sh writes the session
+    # blowfish secret into /etc/phpmyadmin at every start. Everything else is
+    # locked down (no-new-privileges, unused capabilities dropped, loopback
+    # port only, resource limits).
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /var/lib/php/sessions:rw,noexec,nosuid,size=16m
+      # The phpMyAdmin image keeps its PHP sessions in /sessions.
+      - /sessions:rw,noexec,nosuid,size=16m
+      - /var/run/apache2:rw,noexec,nosuid,size=8m
+      - /var/lock/apache2:rw,noexec,nosuid,size=8m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      # Needed capabilities are kept: the Apache entrypoint drops privileges
+      # to www-data (SETUID/SETGID/CHOWN/DAC_OVERRIDE) and binds port 80
+      # (NET_BIND_SERVICE). The rest is unnecessary.
+      - NET_RAW
+      - SETPCAP
+      - AUDIT_WRITE
+      - MKNOD
+      - FSETID
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@fsockopen('127.0.0.1', 80) ? 0 : 1);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+          pids: 256
+    logging: *logging
     networks:
-      exitnode-bridge:
-        ipv4_address: 172.31.255.6
+      - data
+      # Docker can only publish a port of a container that is on at least one
+      # non-internal network; this one carries nothing but that published port.
+      - pma
 
 volumes:
+  # Default naming (cv_mysql-data) on purpose: this is the volume the stack
+  # already uses, keeping the existing data.
   mysql-data:
 
 networks:
-  exitnode-bridge:
+  # Application tier (site <-> API) and the network the stack publishes from.
+  # The subnet is fixed because the host routes it (keep it when renaming).
+  app:
     driver: bridge
     ipam:
       config:
         - subnet: 172.31.255.0/24
           gateway: "172.31.255.1"
+
+  # Data tier: no internet egress, unreachable from outside the stack.
+  data:
+    driver: bridge
+    internal: true
+
+  # Empty bridge used only so phpMyAdmin's loopback port can be published.
+  pma:
+    driver: bridge
