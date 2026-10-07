@@ -1,0 +1,10 @@
+blank_issues_enabled: true
+contact_links:
+  # If private vulnerability reporting is enabled in Settings -> Security, point
+  # this at https://github.com/CsabaTuri/cv/security/advisories/new instead.
+  - name: Security vulnerability
+    url: https://github.com/CsabaTuri/cv/blob/main/SECURITY.md
+    about: Report it privately by email, never in a public issue.
+  - name: Documentation
+    url: https://github.com/CsabaTuri/cv#readme
+    about: Setup, architecture, tests and operations - in English and Hungarian.

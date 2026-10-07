@@ -579,16 +579,29 @@ jobs:
       - name: Build the images
         run: docker compose -f docker-compose.yml -f docker-compose.prod.yml build
 
+      # The registry prefix and the tags live in docker-compose.yml and
+      # nowhere else - repeating them here is what let this job go stale.
+      - name: Read the image names out of the compose files
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+            config --format json \
+            | jq -r '.services
+                     | {"CV_IMAGE": .cv.image,
+                        "CHAT_IMAGE": .["chat-backend"].image,
+                        "DEPLOYER_IMAGE": .deployer.image}
+                     | to_entries[] | "\(.key)=\(.value)"' >> "$GITHUB_ENV"
+
       - name: The images carry the requested tags
         run: |
-          for image in cv-web:ci cv-chat-backend:ci cv-deployer:ci; do
+          for image in "$CV_IMAGE" "$CHAT_IMAGE" "$DEPLOYER_IMAGE"; do
             docker image inspect "$image" >/dev/null
+            echo "ok: $image"
           done
 
       - name: nginx accepts the configuration
-        run: docker run --rm --entrypoint nginx cv-web:ci -t
+        run: docker run --rm --entrypoint nginx "$CV_IMAGE" -t
 
       - name: The backend image ships the push module
         run: |
-          docker run --rm --entrypoint node cv-chat-backend:ci \
+          docker run --rm --entrypoint node "$CHAT_IMAGE" \
             -e "require('web-push'); console.log('web-push loads')"

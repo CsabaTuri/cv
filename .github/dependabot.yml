@@ -1,0 +1,111 @@
+version: 2
+updates:
+  # The tooling at the root: ESLint, Prettier, Playwright, TypeScript.
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      production-dependencies:
+        dependency-type: production
+        patterns: ['*']
+      development-dependencies:
+        dependency-type: development
+        patterns: ['*']
+
+  # The site: Next.js, React, Tailwind, Framer Motion.
+  - package-ecosystem: npm
+    directory: '/cv'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      production-dependencies:
+        dependency-type: production
+        patterns: ['*']
+      development-dependencies:
+        dependency-type: development
+        patterns: ['*']
+
+  # The chat and admin API: Express, mysql2, web-push.
+  - package-ecosystem: npm
+    directory: '/chat-backend'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      production-dependencies:
+        dependency-type: production
+        patterns: ['*']
+      development-dependencies:
+        dependency-type: development
+        patterns: ['*']
+
+  # The workflows: actions/checkout, setup-node, cache, upload-artifact, Pages.
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+      include: scope
+    groups:
+      actions:
+        patterns: ['*']
+
+  # The base images of the three Dockerfiles.
+  - package-ecosystem: docker
+    directory: '/cv'
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      base-images:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directory: '/chat-backend'
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      base-images:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directory: '/deployer'
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      base-images:
+        patterns: ['*']
+
+  # The pinned tags in the compose file: mysql and phpmyadmin.
+  - package-ecosystem: docker-compose
+    directory: '/'
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      compose-images:
+        patterns: ['*']

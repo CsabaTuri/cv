@@ -1,8 +1,13 @@
 # Önéletrajz + egyedi chat stack
 
 [![CI](https://github.com/CsabaTuri/cv/actions/workflows/ci.yml/badge.svg)](https://github.com/CsabaTuri/cv/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Node](https://img.shields.io/badge/node-20%20%7C%2022-brightgreen)](https://github.com/CsabaTuri/cv/blob/main/.github/workflows/ci.yml)
+[![Docker](https://img.shields.io/badge/docker-ready-blue)](./docker-compose.yml)
 
 [English version](./README.md) · **Magyar**
+
+[Élő demó](https://cv.turicsaba.hu/) · [Admin panel](https://cv.turicsaba.hu/admin/) · [Dokumentáció](#dokumentáció) · [Közreműködés](./CONTRIBUTING.hu.md) · [Biztonsági szabályzat](./SECURITY.hu.md) · [Magatartási kódex](./CODE_OF_CONDUCT.hu.md)
 
 Statikus önéletrajz oldal (Next.js SSG, nginx szolgálja ki) saját chattel:
 látogatói chat widget, admin beérkező (inbox) és egy kisebb CMS az oldal
@@ -511,9 +516,12 @@ futtatja a szkriptet.
 A tesztkészlet leírása: [Tesztek és CI](#tesztek-és-ci). Minden dokumentum
 megvan angolul és magyarul is:
 
-* [chat-backend/README.md](./chat-backend/README.md) — az API, benne a push végpontok (angolul).
-* [chat-backend/README.hu.md](./chat-backend/README.hu.md) — ugyanaz magyarul.
-* [cv/README.md](./cv/README.md) — a statikus önéletrajz oldal, oldalak, build (angolul).
-* [cv/README.hu.md](./cv/README.hu.md) — ugyanaz magyarul.
-* [.devcontainer/README.md](./.devcontainer/README.md) — a Codespaces környezet (angolul).
-* [.devcontainer/README.hu.md](./.devcontainer/README.hu.md) — ugyanaz magyarul.
+| Angol | Magyar | Miről szól |
+| --- | --- | --- |
+| [README.md](./README.md) | [README.hu.md](./README.hu.md) | architektúra, stack, tesztek, üzemeltetés |
+| [cv/README.md](./cv/README.md) | [cv/README.hu.md](./cv/README.hu.md) | a statikus önéletrajz oldal, oldalak, build |
+| [chat-backend/README.md](./chat-backend/README.md) | [chat-backend/README.hu.md](./chat-backend/README.hu.md) | az API, a séma, a push végpontok |
+| [.devcontainer/README.md](./.devcontainer/README.md) | [.devcontainer/README.hu.md](./.devcontainer/README.hu.md) | a Codespaces környezet |
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | [CONTRIBUTING.hu.md](./CONTRIBUTING.hu.md) | hibajelentés, pull request |
+| [SECURITY.md](./SECURITY.md) | [SECURITY.hu.md](./SECURITY.hu.md) | biztonsági rés privát jelentése |
+| [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) | [CODE_OF_CONDUCT.hu.md](./CODE_OF_CONDUCT.hu.md) | a Contributor Covenant 2.1 |

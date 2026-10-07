@@ -1,8 +1,13 @@
 # CV + custom chat stack
 
 [![CI](https://github.com/CsabaTuri/cv/actions/workflows/ci.yml/badge.svg)](https://github.com/CsabaTuri/cv/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Node](https://img.shields.io/badge/node-20%20%7C%2022-brightgreen)](https://github.com/CsabaTuri/cv/blob/main/.github/workflows/ci.yml)
+[![Docker](https://img.shields.io/badge/docker-ready-blue)](./docker-compose.yml)
 
 [Magyar verzió](./README.hu.md) · **English**
+
+[Live demo](https://cv.turicsaba.hu/) · [Admin panel](https://cv.turicsaba.hu/admin/) · [Documentation](#documentation) · [Contributing](./CONTRIBUTING.md) · [Security policy](./SECURITY.md) · [Code of Conduct](./CODE_OF_CONDUCT.md)
 
 A static CV site (Next.js SSG, served by nginx) with its own chat: a
 visitor widget, an admin inbox and a small CMS for the site copy — no
@@ -510,9 +515,12 @@ script in a sandbox repository with stubbed `docker` and `curl` binaries.
 The test suite is described under [Tests and CI](#tests-and-ci). Every document
 exists in English and Hungarian:
 
-* [chat-backend/README.md](./chat-backend/README.md) — the API, including the push endpoints (English).
-* [chat-backend/README.hu.md](./chat-backend/README.hu.md) — the same in Hungarian.
-* [cv/README.md](./cv/README.md) — the static CV site, its pages and the build (English).
-* [cv/README.hu.md](./cv/README.hu.md) — the same in Hungarian.
-* [.devcontainer/README.md](./.devcontainer/README.md) — the Codespaces environment (English).
-* [.devcontainer/README.hu.md](./.devcontainer/README.hu.md) — the same in Hungarian.
+| English | Hungarian | What it covers |
+| --- | --- | --- |
+| [README.md](./README.md) | [README.hu.md](./README.hu.md) | architecture, stack, tests, operations |
+| [cv/README.md](./cv/README.md) | [cv/README.hu.md](./cv/README.hu.md) | the static CV site, its pages, the build |
+| [chat-backend/README.md](./chat-backend/README.md) | [chat-backend/README.hu.md](./chat-backend/README.hu.md) | the API, the schema, the push endpoints |
+| [.devcontainer/README.md](./.devcontainer/README.md) | [.devcontainer/README.hu.md](./.devcontainer/README.hu.md) | the Codespaces environment |
+| [CONTRIBUTING.md](./CONTRIBUTING.md) | [CONTRIBUTING.hu.md](./CONTRIBUTING.hu.md) | reporting bugs, sending pull requests |
+| [SECURITY.md](./SECURITY.md) | [SECURITY.hu.md](./SECURITY.hu.md) | reporting a vulnerability privately |
+| [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) | [CODE_OF_CONDUCT.hu.md](./CODE_OF_CONDUCT.hu.md) | the Contributor Covenant 2.1 |
