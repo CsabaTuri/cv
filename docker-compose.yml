@@ -42,6 +42,28 @@ services:
       exitnode-bridge:
         ipv4_address: 172.31.255.3
 
+  # -------------------------------------------------------------------------
+  # chat-backend - custom (non-Crisp) chat widget backend.
+  # Proxies the portfolio chat messages to the n8n webhook, keeping the
+  # webhook credential server-side. Reached by the site through the nginx
+  # /api/chat proxy at 172.31.255.2. Host port 3112.
+  # -------------------------------------------------------------------------
+  chat-backend:
+    build: ./chat-backend
+    container_name: chat_backend
+    restart: always
+    ports:
+      - "3112:3000"
+    environment:
+      - PORT=3000
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
+      - N8N_WEBHOOK_TOKEN=${N8N_WEBHOOK_TOKEN}
+    env_file:
+      - .env
+    networks:
+      exitnode-bridge:
+        ipv4_address: 172.31.255.4
+
 networks:
   exitnode-bridge:
     driver: bridge

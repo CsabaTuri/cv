@@ -100,11 +100,23 @@
   "footer": {
     "rights": "Minden jog fenntartva."
   },
+  "chat": {
+    "title": "Saját asszisztens",
+    "subtitle": "Írj üzenetet, és továbbítjuk.",
+    "greeting": "Szia! Miben segíthetek?",
+    "placeholder": "Írd be az üzeneted…",
+    "send": "Küldés",
+    "thinking": "Válasz érkezik…",
+    "sent": "Üzenet elküldve.",
+    "error": "Nem sikerült elküldeni az üzenetet. Próbáld újra később."
+  },
   "a11y": {
     "themeToggle": "Sötét mód váltása",
     "langToggle": "Nyelv váltása",
     "menu": "Menü megnyitása",
-    "closeMenu": "Menü bezárása"
+    "closeMenu": "Menü bezárása",
+    "chatToggle": "Chat megnyitása",
+    "chatClose": "Chat bezárása"
   },
   "notFound": {
     "code": "404",

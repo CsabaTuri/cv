@@ -100,11 +100,23 @@
   "footer": {
     "rights": "All rights reserved."
   },
+  "chat": {
+    "title": "Custom assistant",
+    "subtitle": "Send a message and we'll forward it.",
+    "greeting": "Hi! How can I help you?",
+    "placeholder": "Type your message…",
+    "send": "Send",
+    "thinking": "Waiting for a reply…",
+    "sent": "Message sent.",
+    "error": "Could not send the message. Please try again later."
+  },
   "a11y": {
     "themeToggle": "Toggle dark mode",
     "langToggle": "Switch language",
     "menu": "Open menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "chatToggle": "Open chat",
+    "chatClose": "Close chat"
   },
   "notFound": {
     "code": "404",
