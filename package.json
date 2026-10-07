@@ -11,6 +11,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "db:test:start": "bash tests/test-db.sh start",
+    "db:test:stop": "bash tests/test-db.sh stop",
     "test": "node --test tests/*.test.mjs",
     "test:junit": "mkdir -p test-results && node --test --test-reporter=junit --test-reporter-destination=test-results/junit.xml tests/*.test.mjs",
     "test:report": "node .github/scripts/test-summary.mjs",

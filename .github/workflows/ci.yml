@@ -1,6 +1,10 @@
 # ---------------------------------------------------------------------------
 # CI: everything that has to hold before something reaches the host.
 #
+# Anyone with access to the repository can run it from the Actions tab
+# (workflow_dispatch, with a Node version and whether to run the browser suite),
+# which is the first of the three ways the README offers to try this project.
+#
 #   lint   - ESLint and Prettier over the whole repository
 #   site   - TypeScript + the static export, including the PWA files
 #   api    - the test suite against a real MySQL (the same shape as the stack),
@@ -40,7 +44,20 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The button in the Actions tab: anyone who can see the repository can start
+  # the suite from the browser. Two inputs keep a demo run cheap, and neither of
+  # them can reach the registry - that is the publish job's own guard.
   workflow_dispatch:
+    inputs:
+      node-version:
+        description: 'Node.js version for the API suite'
+        type: choice
+        options: ['20', '22']
+        default: '22'
+      run-e2e:
+        description: 'Run the Playwright suite (the slow one)'
+        type: boolean
+        default: true
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -119,8 +136,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 20 is what the images run, 22 is the current release.
-        node: ['20', '22']
+        # Pushes and pull requests run both versions (20 is what the images run,
+        # 22 is the current release); a manual run only the one that was picked.
+        node: ${{ github.event_name == 'workflow_dispatch' && fromJSON(format('["{0}"]', inputs['node-version'])) || fromJSON('["20", "22"]') }}
 
     services:
       mysql:
@@ -211,6 +229,9 @@ jobs:
 
   e2e:
     name: End to end (Chromium)
+    # A manual run may skip it: this is the slow job, and a quick demo does not
+    # always need a browser and a database.
+    if: github.event_name != 'workflow_dispatch' || inputs['run-e2e']
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
@@ -328,8 +349,13 @@ jobs:
   publish:
     name: Publish the images
     needs: [lint, site, api, e2e, docker]
-    # Only from main: a pull request must never publish anything.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Only this repository, only from main, only after everything is green. A fork
+    # gets a read-only token and could not push anyway, but the job is skipped
+    # there instead of failing, and a manual run never publishes either.
+    if: >
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      github.repository == 'CsabaTuri/cv'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:

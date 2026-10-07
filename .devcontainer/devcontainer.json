@@ -1,0 +1,37 @@
+{
+  "name": "CV stack (Next.js + chat + MySQL + nginx)",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "npm ci && npm ci --prefix cv && npm ci --prefix chat-backend",
+  "postStartCommand": "npm run db:test:start || echo 'the test database did not start - run: npm run db:test:start'",
+  "forwardPorts": [3036, 8081],
+  "portsAttributes": {
+    "3036": {
+      "label": "CV site (nginx)",
+      "onAutoForward": "notify"
+    },
+    "8081": {
+      "label": "phpMyAdmin - the chat database",
+      "onAutoForward": "silent"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-playwright.playwright"
+      ],
+      "settings": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "eslint.useFlatConfig": true,
+        "files.eol": "\n"
+      }
+    }
+  },
+  "remoteUser": "node"
+}

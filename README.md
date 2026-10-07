@@ -1,5 +1,7 @@
 # CV + custom chat stack
 
+[![CI](https://github.com/CsabaTuri/cv/actions/workflows/ci.yml/badge.svg)](https://github.com/CsabaTuri/cv/actions/workflows/ci.yml)
+
 [Magyar verzió](./README.hu.md) · **English**
 
 A static CV site (Next.js SSG, served by nginx) with its own chat: a
@@ -56,6 +58,58 @@ The production overlay pins the admin API and phpMyAdmin to the host loopback
 interface (a loosened `API_BIND`/`PHPMYADMIN_BIND` in `.env` cannot expose
 them), tightens the log rotation and sets shutdown grace periods plus open-file
 limits.
+
+## Try it yourself
+
+Three ways to see it work, from the laziest one to the most hands-on. None of
+them needs anything installed locally.
+
+### 1. Run the CI
+
+[**Actions → CI → Run workflow**](https://github.com/CsabaTuri/cv/actions/workflows/ci.yml)
+starts the whole suite in the browser, on GitHub's runners, and the badge above
+shows whether the last one passed. Two inputs keep a demo run cheap:
+
+| Input | Meaning |
+| --- | --- |
+| `node-version` | which Node the API suite runs on (20 or 22; a push runs both) |
+| `run-e2e` | whether the Playwright job runs at all (the slow one) |
+
+The results are readable without opening a log: a summary per job, one summary
+for the whole suite, and the Allure dashboard - see
+[Tests and CI](#tests-and-ci).
+
+### 2. Open it in a Codespace
+
+[**Create a codespace**](https://codespaces.new/CsabaTuri/cv) - or *Code →
+Codespaces → Create codespace on main* - gives the same environment: Node 22,
+Docker inside the container, the dependencies installed, ESLint, Prettier and the
+Playwright extension ready, and a throwaway MySQL already running. So both suites
+work with no configuration at all:
+
+```bash
+npm test        # 58 unit and integration tests
+npm run e2e     # 18 Playwright tests (see .devcontainer/README.md for the two one-time commands)
+```
+
+The interesting ports are forwarded as soon as something listens on them: 3036
+for the site and 8081 for phpMyAdmin. [`.devcontainer/README.md`](./.devcontainer/README.md)
+has the four lines that start the whole stack inside the codespace.
+
+### 3. Fork it and change it
+
+[**Fork**](https://github.com/CsabaTuri/cv/fork) gives a repository where every
+workflow runs, with two deliberate exceptions:
+
+* **`publish` never runs there.** The job requires
+  `github.repository == 'CsabaTuri/cv'`, a push to `main`, and every other job to
+  be green - so a fork (or a manual run) skips it instead of failing, and nothing
+  is ever pushed to the registry. The token in a fork is read-only anyway.
+* the report comment on a pull request is skipped when the token cannot write
+  (that is what a fork gets); the run page still shows every report.
+
+What a fork does not get: the `ghcr.io` images and the deployed site - both belong
+to this repository.
 
 ## Quick start
 
@@ -203,8 +257,9 @@ npm run e2e                   # Playwright against the real stack
 | --- | --- |
 | `npm run lint` | one flat config ([`eslint.config.mjs`](./eslint.config.mjs)): Node globals for `chat-backend/`, `deployer/`, `tests/` and `.github/scripts/`, plus TypeScript, React hooks, `jsx-a11y` and the Next rules for `cv/src` |
 | `npm run format` | Prettier over JS/TS/JSX/JSON/CSS. Markdown, the compose files, the workflows and `.env*` are left alone on purpose - they are wrapped by hand and reviewed line by line (see [`.prettierignore`](./.prettierignore)) |
-| `npm test` | the 54 unit and integration tests in [`tests/`](./tests) |
+| `npm test` | the 58 unit and integration tests in [`tests/`](./tests) |
 | `npm run e2e` | 18 Playwright tests against the real export, the real API and a real database |
+| `npm run db:test:start` / `db:test:stop` | the throwaway MySQL both suites expect (`127.0.0.1:3306`, database `cv_chat_test`), so they run with no configuration - `DB_PORT=3307 npm run db:test:start` when 3306 is taken |
 
 The end-to-end run needs the export first; Playwright then starts both servers
 itself (the API from `chat-backend/`, and `cv/out` through
@@ -246,7 +301,7 @@ pull request and on pushes to `main`:
 | `e2e` | builds the export, installs Chromium and runs the Playwright suite against the same `mysql:8.4` service (18 tests) |
 | `summary` | collects the reports of `api` and `e2e`, writes the whole suite into one summary (**72 tests** in a single table) and renders the Allure dashboard, published to GitHub Pages when it is available |
 | `docker` | both overlays, the fail-fast guard without a `.env`, `docker compose build`, and `nginx -t` inside the built image |
-| `publish` | only on `main`, and only once every job above is green: builds the three images through the compose files and pushes them to `ghcr.io` |
+| `publish` | only in this repository (`github.repository`), only on `main`, and only once every job above is green: builds the three images through the compose files and pushes them to `ghcr.io` |
 
 Every job has its own summary, so a single job's numbers are never the whole
 story: `summary` is the one to look at first, and it is the reason the unit tests
@@ -268,6 +323,10 @@ A host can then pull instead of building: set the same tag in its `.env` and
 ```bash
 docker compose pull && docker compose up -d
 ```
+
+The job is deliberately narrow: it needs a push to `main` **and**
+`github.repository == 'CsabaTuri/cv'` **and** every other job to be green. A fork
+and a manual run skip it, so nothing can publish from anywhere but here.
 
 The repository is private, and the packages are too, so *pulling* needs a login
 on that host (a personal access token with `read:packages`):
@@ -448,10 +507,12 @@ script in a sandbox repository with stubbed `docker` and `curl` binaries.
 
 ## Documentation
 
-The test suite is described under [Tests and CI](#tests-and-ci).
+The test suite is described under [Tests and CI](#tests-and-ci). Every document
+exists in English and Hungarian:
 
-* [chat-backend/README.md](./chat-backend/README.md) — the API, including the push endpoints.
-* [cv/README.md](./cv/README.md) — static CV site, pages, build (English).
-* [cv/README.hu.md](./cv/README.hu.md) — ugyanaz magyarul.
-* [chat-backend/README.md](./chat-backend/README.md) — API endpoints, schema (English).
-* [chat-backend/README.hu.md](./chat-backend/README.hu.md) — ugyanaz magyarul.
+* [chat-backend/README.md](./chat-backend/README.md) — the API, including the push endpoints (English).
+* [chat-backend/README.hu.md](./chat-backend/README.hu.md) — the same in Hungarian.
+* [cv/README.md](./cv/README.md) — the static CV site, its pages and the build (English).
+* [cv/README.hu.md](./cv/README.hu.md) — the same in Hungarian.
+* [.devcontainer/README.md](./.devcontainer/README.md) — the Codespaces environment (English).
+* [.devcontainer/README.hu.md](./.devcontainer/README.hu.md) — the same in Hungarian.

@@ -1,5 +1,7 @@
 # Önéletrajz + egyedi chat stack
 
+[![CI](https://github.com/CsabaTuri/cv/actions/workflows/ci.yml/badge.svg)](https://github.com/CsabaTuri/cv/actions/workflows/ci.yml)
+
 [English version](./README.md) · **Magyar**
 
 Statikus önéletrajz oldal (Next.js SSG, nginx szolgálja ki) saját chattel:
@@ -55,6 +57,59 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 Az éles overlay az admin API-t és a phpMyAdmin-t a host loopback interfészére
 kötözi (tehát egy lazább `API_BIND`/`PHPMYADMIN_BIND` a `.env`-ben sem teszi ki
 őket), szigorúbb log rotációt, leállítási grace periodot és nofile limiteket ad.
+
+## Próbáld ki magad
+
+Három út, a lustábbtól a legaktívabbig. Egyikhez sem kell helyileg telepíteni
+semmit.
+
+### 1. Futtasd a CI-t
+
+[**Actions → CI → Run workflow**](https://github.com/CsabaTuri/cv/actions/workflows/ci.yml)
+elindítja a teljes készletet a böngészőből, a GitHub runnerjein; a fenti badge
+mutatja, hogy a legutóbbi átment-e. Két input tartja olcsón a bemutató futást:
+
+| Input | Jelentése |
+| --- | --- |
+| `node-version` | melyik Node-on fusson az API készlet (20 vagy 22; pushnál mindkettő) |
+| `run-e2e` | lefusson-e a Playwright job egyáltalán (a lassú) |
+
+Az eredmények naplóböngészés nélkül is olvashatók: jobonkénti összefoglaló, egy
+összefoglaló a teljes készletre, és az Allure dashboard — lásd
+[Tesztek és CI](#tesztek-és-ci).
+
+### 2. Nyisd meg Codespace-ben
+
+[**Codespace létrehozása**](https://codespaces.new/CsabaTuri/cv) — vagy *Code →
+Codespaces → Create codespace on main* — ugyanazt a környezetet adja: Node 22, Docker
+a konténeren belül, telepített függőségek, kész ESLint, Prettier és Playwright
+kiterjesztés, és egy már futó eldobható MySQL. Így mindkét készlet nulla
+konfigurációval megy:
+
+```bash
+npm test        # 58 unit és integrációs teszt
+npm run e2e     # 18 Playwright teszt (a két egyszeri parancsot lásd: .devcontainer/README.hu.md)
+```
+
+A fontos portok rögtön forwardolódnak, amint figyel rajtuk valami: 3036 az oldal,
+8081 a phpMyAdmin. A [`.devcontainer/README.hu.md`](./.devcontainer/README.hu.md)
+négy sorban megadja, hogyan indul a teljes stack a codespace-en belül.
+
+### 3. Forkold és módosítsd
+
+A [**Fork**](https://github.com/CsabaTuri/cv/fork) egy olyan repót ad, ahol minden
+workflow lefut, két szándékos kivétellel:
+
+* **a `publish` ott soha nem fut.** A jobhoz kell a
+  `github.repository == 'CsabaTuri/cv'`, egy `main`-re való push, és hogy minden
+  másik job zöld legyen — így forkban (vagy kézi indításnál) kimarad ahelyett,
+  hogy elhasalna, és semmi nem kerül a registrybe. Forkban a token úgyis csak
+  olvasásra jó.
+* a pull request jelentés-kommentje kimarad, ha a token nem tud írni (forkban
+  pontosan ez van); a futtatás oldala így is mutat minden riportot.
+
+Amit forkban nem kapsz meg: a `ghcr.io` image-eket és a kiszolgált oldalt — mindkettő
+ehhez a repóhoz tartozik.
 
 ## Gyors indítás
 
@@ -202,8 +257,9 @@ npm run e2e                   # Playwright a valódi stack ellen
 | --- | --- |
 | `npm run lint` | egy flat config ([`eslint.config.mjs`](./eslint.config.mjs)): Node globals a `chat-backend/`, `deployer/`, `tests/` és `.github/scripts/` alatt, plusz TypeScript, React hooks, `jsx-a11y` és a Next szabályok a `cv/src`-re |
 | `npm run format` | Prettier JS/TS/JSX/JSON/CSS fájlokra. A markdown, a compose fájlok, a workflow-k és a `.env*` szándékosan kimaradnak - azokat kézzel tördelve, soronként átnézve írtuk (lásd [`.prettierignore`](./.prettierignore)) |
-| `npm test` | az 54 unit és integrációs teszt a [`tests/`](./tests) alatt |
+| `npm test` | az 58 unit és integrációs teszt a [`tests/`](./tests) alatt |
 | `npm run e2e` | 18 Playwright teszt a valódi export, a valódi API és egy valódi adatbázis ellen |
+| `npm run db:test:start` / `db:test:stop` | az eldobható MySQL, amit mindkét készlet vár (`127.0.0.1:3306`, `cv_chat_test` adatbázis), így konfiguráció nélkül futnak — `DB_PORT=3307 npm run db:test:start`, ha a 3306 foglalt |
 
 Az end-to-end futáshoz előbb kell az export; a két szervert aztán a Playwright
 indítja (az API-t a `chat-backend/`-ből, a `cv/out`-ot pedig a
@@ -242,11 +298,11 @@ minden pull requestnél és a `main`-re való pushnál:
 | --- | --- |
 | `lint` | ESLint és `prettier --check` az egész repository-ra |
 | `site` | typecheck + statikus export, benne a PWA fájlok |
-| `api` | a fenti készlet `mysql:8.4` service ellen, Node 20-on és 22-n (egyszerre 54 teszt) |
+| `api` | a fenti készlet `mysql:8.4` service ellen, Node 20-on és 22-n (egyszerre 58 teszt) |
 | `e2e` | megépíti az exportot, telepíti a Chromiumot, és lefuttatja a Playwright készletet ugyanazon a `mysql:8.4` service-en (18 teszt) |
 | `summary` | összegyűjti az `api` és `e2e` jelentéseit, a teljes készletet egy összefoglalóba írja (**72 teszt** egy táblázatban), és legenerálja az Allure dashboardot, amit GitHub Pagesre publikál, ha az elérhető |
 | `docker` | mindkét overlay, a fail-fast őr `.env` nélkül, `docker compose build`, és `nginx -t` a megépített image-ben |
-| `publish` | csak `main`-en, és csak ha minden fenti job zöld: a compose fájlokon keresztül megépíti a három image-et, és feltolja a `ghcr.io`-ra |
+| `publish` | csak ebben a repóban (`github.repository`), csak `main`-en, és csak ha minden fenti job zöld: a compose fájlokon keresztül megépíti a három image-et, és feltolja a `ghcr.io`-ra |
 
 Minden jobnak saját összefoglalója van, ezért egy job száma még nem a teljes kép:
 a `summary` az, amit először érdemes megnézni — és ez az oka annak is, hogy a unit
@@ -268,6 +324,10 @@ Egy host ezután építés helyett húzhat: állítsd ugyanezt a taget a `.env`-
 ```bash
 docker compose pull && docker compose up -d
 ```
+
+A job szándékosan szűk: kell hozzá `main`-re való push **és**
+`github.repository == 'CsabaTuri/cv'` **és** hogy minden másik job zöld legyen. Fork
+és kézi indítás esetén kimarad, így csak innen kerülhet ki bármi a registrybe.
 
 A repository privát, és a package-ek is azok, ezért a *húzáshoz* bejelentkezés kell
 azon a hoston (személyes token `read:packages` joggal):
@@ -448,10 +508,12 @@ futtatja a szkriptet.
 
 ## Dokumentáció
 
-A tesztkészlet leírása: [Tesztek és CI](#tesztek-és-ci).
+A tesztkészlet leírása: [Tesztek és CI](#tesztek-és-ci). Minden dokumentum
+megvan angolul és magyarul is:
 
-* [chat-backend/README.hu.md](./chat-backend/README.hu.md) — az API, benne a push végpontok.
-* [cv/README.md](./cv/README.md) — statikus önéletrajz oldal (angolul).
-* [cv/README.hu.md](./cv/README.hu.md) — statikus önéletrajz oldal magyarul.
-* [chat-backend/README.md](./chat-backend/README.md) — API végpontok, séma (angolul).
-* [chat-backend/README.hu.md](./chat-backend/README.hu.md) — API végpontok, séma magyarul.
+* [chat-backend/README.md](./chat-backend/README.md) — az API, benne a push végpontok (angolul).
+* [chat-backend/README.hu.md](./chat-backend/README.hu.md) — ugyanaz magyarul.
+* [cv/README.md](./cv/README.md) — a statikus önéletrajz oldal, oldalak, build (angolul).
+* [cv/README.hu.md](./cv/README.hu.md) — ugyanaz magyarul.
+* [.devcontainer/README.md](./.devcontainer/README.md) — a Codespaces környezet (angolul).
+* [.devcontainer/README.hu.md](./.devcontainer/README.hu.md) — ugyanaz magyarul.
