@@ -1,7 +1,7 @@
-import type {ReactNode} from 'react';
-import type {Metadata, Viewport} from 'next';
-import {Inter} from 'next/font/google';
-import {ContentProvider} from '@/components/ContentProvider';
+import type { ReactNode } from 'react';
+import type { Metadata, Viewport } from 'next';
+import { Inter } from 'next/font/google';
+import { ContentProvider } from '@/components/ContentProvider';
 import PwaSetup from '@/components/PwaSetup';
 import './globals.css';
 
@@ -12,8 +12,7 @@ const inter = Inter({
 });
 
 // Cloudflare Web Analytics token (NEXT_PUBLIC_ = inlined into the client bundle at build time).
-const CLOUDFLARE_TOKEN =
-  process.env.NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN ?? '';
+const CLOUDFLARE_TOKEN = process.env.NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN ?? '';
 
 // Placeholder for the pre-render / SEO baseline; the live values come from the
 // database and are applied in ContentProvider.
@@ -25,7 +24,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://turicsaba.hu'),
   title: TITLE,
   description: DESCRIPTION,
-  alternates: {canonical: '/'},
+  alternates: { canonical: '/' },
   // Installable app (PWA): manifest + the icon set the browsers ask for.
   manifest: '/manifest.webmanifest',
   applicationName: 'Túri Csaba',
@@ -36,11 +35,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      {url: '/favicon.ico', sizes: 'any'},
-      {url: '/icons/icon-192.png', type: 'image/png', sizes: '192x192'},
-      {url: '/icons/icon-512.png', type: 'image/png', sizes: '512x512'},
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icons/icon-192.png', type: 'image/png', sizes: '192x192' },
+      { url: '/icons/icon-512.png', type: 'image/png', sizes: '512x512' },
     ],
-    apple: [{url: '/apple-touch-icon.png', sizes: '180x180'}],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180' }],
   },
   openGraph: {
     title: TITLE,
@@ -65,7 +64,7 @@ export const viewport: Viewport = {
   themeColor: '#ffffff',
 };
 
-export default function RootLayout({children}: Readonly<{children: ReactNode}>) {
+export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="hu" className={inter.variable} data-scroll-behavior="smooth">
       <body className="font-sans">

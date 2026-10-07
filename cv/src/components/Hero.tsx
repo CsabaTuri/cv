@@ -1,21 +1,21 @@
 'use client';
 
-import {useEffect, useState} from 'react';
-import {AnimatePresence, motion, type Variants} from 'framer-motion';
-import {useJsonList, useText} from './ContentProvider';
-import {ArrowDown} from './icons';
+import { useEffect, useState } from 'react';
+import { AnimatePresence, motion, type Variants } from 'framer-motion';
+import { useJsonList, useText } from './ContentProvider';
+import { ArrowDown } from './icons';
 import CvDownload from './CvDownload';
 
 const container: Variants = {
   hidden: {},
   show: {
-    transition: {staggerChildren: 0.12, delayChildren: 0.1},
+    transition: { staggerChildren: 0.12, delayChildren: 0.1 },
   },
 };
 
 const item: Variants = {
-  hidden: {opacity: 0, y: 20},
-  show: {opacity: 1, y: 0, transition: {duration: 0.6, ease: 'easeOut'}},
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
 };
 
 export default function Hero() {
@@ -31,10 +31,7 @@ export default function Hero() {
   useEffect(() => {
     if (roles.length < 2) return;
 
-    const id = setInterval(
-      () => setIndex((i) => (i + 1) % roles.length),
-      3200,
-    );
+    const id = setInterval(() => setIndex((i) => (i + 1) % roles.length), 3200);
     return () => clearInterval(id);
   }, [roles.length]);
 
@@ -67,10 +64,10 @@ export default function Hero() {
           <AnimatePresence mode="wait">
             <motion.span
               key={index}
-              initial={{opacity: 0, y: 12}}
-              animate={{opacity: 1, y: 0}}
-              exit={{opacity: 0, y: -12}}
-              transition={{duration: 0.35}}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.35 }}
             >
               {roles[index] ?? ''}
             </motion.span>
@@ -107,9 +104,9 @@ export default function Hero() {
       <motion.a
         href="#about"
         aria-label={scrollLabel}
-        initial={{opacity: 0}}
-        animate={{opacity: 1}}
-        transition={{delay: 1.4, duration: 0.6}}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.4, duration: 0.6 }}
         className="absolute bottom-8 left-1/2 -translate-x-1/2 text-gray-400 transition-colors hover:text-gray-600"
       >
         <ArrowDown className="h-5 w-5 animate-bounce" />

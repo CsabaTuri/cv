@@ -1,0 +1,34 @@
+# Prettier owns the code: JavaScript, TypeScript, JSX, JSON and CSS.
+# Everything below is either generated, binary, or hand-wrapped text whose
+# line breaks are part of how it reads.
+
+node_modules/
+
+# Build output
+cv/out/
+cv/.next/
+
+# Generated images
+cv/public/icons/
+cv/public/**/*.{png,ico,jpg,jpeg,webp,svg}
+
+# The lockfiles are written by npm, not by a formatter
+package-lock.json
+
+# Documentation is wrapped by hand, in two languages
+*.md
+
+# Prompt files: their line breaks are part of the prompt
+.github/agents/
+
+# Compose files and workflows are hand-tuned and reviewed line by line;
+# `docker compose config` and the CI itself check them
+docker-compose*.yml
+.github/workflows/
+
+# Environment files carry secrets and comments, not code
+.env
+.env.*
+cv/tsconfig.tsbuildinfo
+# Written by Next.js on every build
+cv/next-env.d.ts

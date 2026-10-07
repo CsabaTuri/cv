@@ -183,6 +183,40 @@ GET    /api/admin/push/subscriptions
 POST   /api/admin/push/test      # test notification to the admin's browsers
 ```
 
+## Tooling
+
+The tooling lives in the repository root; the site keeps its own dependencies
+under `cv/`.
+
+```bash
+npm ci                        # ESLint, Prettier, Playwright
+npm ci --prefix cv            # the site
+npm ci --prefix chat-backend  # the API
+
+npm run lint                  # ESLint: services, tests, CI scripts, the site
+npm run format                # Prettier; format:check is what CI runs
+npm test                      # the unit and integration suite
+npm run e2e                   # Playwright against the real stack
+```
+
+| Command | What it covers |
+| --- | --- |
+| `npm run lint` | one flat config ([`eslint.config.mjs`](./eslint.config.mjs)): Node globals for `chat-backend/`, `deployer/`, `tests/` and `.github/scripts/`, plus TypeScript, React hooks, `jsx-a11y` and the Next rules for `cv/src` |
+| `npm run format` | Prettier over JS/TS/JSX/JSON/CSS. Markdown, the compose files, the workflows and `.env*` are left alone on purpose - they are wrapped by hand and reviewed line by line (see [`.prettierignore`](./.prettierignore)) |
+| `npm test` | the 54 unit and integration tests in [`tests/`](./tests) |
+| `npm run e2e` | 18 Playwright tests against the real export, the real API and a real database |
+
+The end-to-end run needs the export first; Playwright then starts both servers
+itself (the API from `chat-backend/`, and `cv/out` through
+[`tests/e2e/server.mjs`](./tests/e2e/server.mjs), which mirrors the proxy and the
+404 rules of `cv/nginx.conf`):
+
+```bash
+npm --prefix cv run build
+npx playwright install --with-deps chromium   # once per machine
+DB_PORT=3307 npm run e2e
+```
+
 ## Tests and CI
 
 Everything lives in [`tests/`](./tests) and needs nothing but Node 20+ and a
@@ -201,11 +235,16 @@ DB_USER=chat DB_PASSWORD=chat ADMIN_TOKEN=ci-admin-token \
 | `tests/content.test.mjs` | the copy catalogue: unique keys, JSON serialisation, and that every key the frontend asks for exists - with the matching hook |
 | `tests/assets.test.mjs` | the PWA (manifest fields, icons on disk with the declared sizes, the worker's handlers), the nginx rules, and the compose invariants this stack got wrong before: no `latest`, no profile on the rebuild helper, the gateway inside its subnet, the VAPID keys reaching both services, `.env.example` in sync |
 
-[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs three jobs on every
-pull request and on pushes to `main`: the site (typecheck + static export,
-including the PWA files), the suite above against a `mysql:8.4` service on Node
-20 and 22, and the images (both overlays, the fail-fast guard without a `.env`,
-`docker compose build`, and `nginx -t` inside the built image).
+[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs five jobs on every
+pull request and on pushes to `main`:
+
+| Job | What it does |
+| --- | --- |
+| `lint` | ESLint and `prettier --check` over the whole repository |
+| `site` | typecheck + static export, including the PWA files |
+| `api` | the suite above against a `mysql:8.4` service, on Node 20 and 22 |
+| `e2e` | builds the export, installs Chromium and runs the Playwright suite against the same `mysql:8.4` service |
+| `docker` | both overlays, the fail-fast guard without a `.env`, `docker compose build`, and `nginx -t` inside the built image |
 
 ### Reading the results
 
@@ -221,7 +260,10 @@ extra tooling or a third-party action:
   markdown itself, kept for 14 days and downloadable from the run page.
 * **Pull request comment** - on a pull request the same markdown is posted as a
   comment and updated in place on every push, instead of one comment per run.
-  On a fork the token is read-only, so that step is allowed to fail there.
+  Each job keeps its own comment: both carry a hidden marker, so the unit and
+  the end-to-end report never overwrite each other
+  ([`.github/scripts/pr-comment.sh`](./.github/scripts/pr-comment.sh)). On a fork
+  the token is read-only, so that step is allowed to fail there.
 
 The same report locally, on top of the command above:
 

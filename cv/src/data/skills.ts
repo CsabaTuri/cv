@@ -35,9 +35,17 @@ export const skillCategories: SkillCategory[] = [
   {
     key: 'containers',
     icon: 'container',
-    items: ['Docker', 'Docker Compose', 'Portainer', 'Jenkins', 'GitHub Actions', 'Netlify', 'CI/CD pipelines'],
+    items: [
+      'Docker',
+      'Docker Compose',
+      'Portainer',
+      'Jenkins',
+      'GitHub Actions',
+      'Netlify',
+      'CI/CD pipelines',
+    ],
   },
-  {key: 'virtualization', icon: 'server', items: ['VMware', 'KVM', 'QEMU']},
+  { key: 'virtualization', icon: 'server', items: ['VMware', 'KVM', 'QEMU'] },
   {
     key: 'ai',
     icon: 'sparkles',
@@ -53,11 +61,18 @@ export const skillCategories: SkillCategory[] = [
     icon: 'code',
     items: ['Python', 'TypeScript', 'PHP', 'Bash'],
   },
-  {key: 'databases', icon: 'database', items: ['MySQL', 'MSSQL', 'Supabase']},
+  { key: 'databases', icon: 'database', items: ['MySQL', 'MSSQL', 'Supabase'] },
   {
     key: 'infrastructure',
     icon: 'shield',
-    items: ['Grafana', 'Prometheus', 'Netdata', 'Kuma', 'Backup & recovery', 'Network configuration'],
+    items: [
+      'Grafana',
+      'Prometheus',
+      'Netdata',
+      'Kuma',
+      'Backup & recovery',
+      'Network configuration',
+    ],
   },
-  {key: 'tools', icon: 'wrench', items: ['Jira', 'Redmine', 'OpenProject']},
+  { key: 'tools', icon: 'wrench', items: ['Jira', 'Redmine', 'OpenProject'] },
 ];

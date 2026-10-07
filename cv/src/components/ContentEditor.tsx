@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback, useEffect, useState} from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 type Field = {
   key: string;
@@ -33,15 +33,13 @@ export default function ContentEditor({
   const [fields, setFields] = useState<Field[]>([]);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState<string[]>([]);
-  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>(
-    'idle',
-  );
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/content', {
-        headers: {Authorization: `Bearer ${token}`},
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (response.status === 401) {
@@ -50,15 +48,11 @@ export default function ContentEditor({
       }
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      const data: {fields?: Field[]} | null = await response
-        .json()
-        .catch(() => null);
+      const data: { fields?: Field[] } | null = await response.json().catch(() => null);
       const incoming = data?.fields ?? [];
 
       setFields(incoming);
-      setDraft(
-        Object.fromEntries(incoming.map((field) => [field.key, displayValue(field)])),
-      );
+      setDraft(Object.fromEntries(incoming.map((field) => [field.key, displayValue(field)])));
       setDirty([]);
       setError(null);
     } catch {
@@ -71,7 +65,7 @@ export default function ContentEditor({
   }, [load]);
 
   function change(key: string, value: string) {
-    setDraft((prev) => ({...prev, [key]: value}));
+    setDraft((prev) => ({ ...prev, [key]: value }));
     setDirty((prev) => (prev.includes(key) ? prev : [...prev, key]));
     setStatus('idle');
   }
@@ -86,8 +80,8 @@ export default function ContentEditor({
       const values = Object.fromEntries(dirty.map((key) => [key, draft[key]]));
       const response = await fetch('/api/admin/content', {
         method: 'PUT',
-        headers: {'Content-Type': 'application/json', Authorization: `Bearer ${token}`},
-        body: JSON.stringify({values}),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ values }),
       });
 
       if (response.status === 401) {
@@ -96,7 +90,7 @@ export default function ContentEditor({
       }
 
       if (!response.ok) {
-        const data: {error?: string} | null = await response.json().catch(() => null);
+        const data: { error?: string } | null = await response.json().catch(() => null);
         throw new Error(data?.error ?? `HTTP ${response.status}`);
       }
 
@@ -112,20 +106,18 @@ export default function ContentEditor({
     }
   }
 
-  const groups: {name: string; items: Field[]}[] = [];
+  const groups: { name: string; items: Field[] }[] = [];
   for (const field of fields) {
     const group = groups.find((item) => item.name === field.group);
     if (group) group.items.push(field);
-    else groups.push({name: field.group, items: [field]});
+    else groups.push({ name: field.group, items: [field] });
   }
 
   return (
     <section className="mx-auto max-w-4xl px-6 pb-16">
       <div className="sticky top-0 z-10 -mx-6 mb-6 flex items-center justify-between gap-4 border-b border-gray-200 bg-gray-50/95 px-6 py-3 backdrop-blur">
         <div>
-          <h2 className="text-sm font-semibold text-gray-800">
-            Weboldal szövegek
-          </h2>
+          <h2 className="text-sm font-semibold text-gray-800">Weboldal szövegek</h2>
           <p className="text-xs text-gray-500">
             {fields.length} mező
             {dirty.length ? ` · ${dirty.length} nem mentett módosítás` : ''}
@@ -133,11 +125,14 @@ export default function ContentEditor({
         </div>
         <div className="flex items-center gap-3">
           {status === 'saved' && (
-            <span className="text-xs font-medium text-green-600">Mentve ✓</span>
+            <span className="text-xs font-medium text-green-600" data-testid="content-saved">
+              Mentve ✓
+            </span>
           )}
           <button
             type="button"
             onClick={save}
+            data-testid="content-save"
             disabled={!dirty.length || status === 'saving'}
             className="rounded-full bg-indigo-600 px-5 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -150,17 +145,12 @@ export default function ContentEditor({
 
       <div className="space-y-6">
         {groups.map((group) => (
-          <div
-            key={group.name}
-            className="rounded-2xl border border-gray-200 bg-white p-5"
-          >
+          <div key={group.name} className="rounded-2xl border border-gray-200 bg-white p-5">
             <h3 className="text-sm font-semibold text-gray-800">{group.name}</h3>
             <div className="mt-4 space-y-4">
               {group.items.map((field) => (
                 <label key={field.key} className="block">
-                  <span className="text-xs font-medium text-gray-600">
-                    {field.label}
-                  </span>
+                  <span className="text-xs font-medium text-gray-600">{field.label}</span>
                   {field.json && (
                     <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
                       JSON
@@ -168,6 +158,8 @@ export default function ContentEditor({
                   )}
                   {field.multiline || field.json ? (
                     <textarea
+                      data-testid="field"
+                      data-key={field.key}
                       value={draft[field.key] ?? ''}
                       onChange={(event) => change(field.key, event.target.value)}
                       rows={field.json ? 10 : 4}
@@ -177,6 +169,8 @@ export default function ContentEditor({
                   ) : (
                     <input
                       type="text"
+                      data-testid="field"
+                      data-key={field.key}
                       value={draft[field.key] ?? ''}
                       onChange={(event) => change(field.key, event.target.value)}
                       className="mt-1 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-400"

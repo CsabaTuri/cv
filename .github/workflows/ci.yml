@@ -1,9 +1,12 @@
 # ---------------------------------------------------------------------------
 # CI: everything that has to hold before something reaches the host.
 #
+#   lint   - ESLint and Prettier over the whole repository
 #   site   - TypeScript + the static export, including the PWA files
 #   api    - the test suite against a real MySQL (the same shape as the stack),
 #            on the runtime version and the current LTS
+#   e2e    - Playwright against the real thing: the exported site, the real
+#            backend and a real MySQL, with nothing mocked
 #   docker - the compose files and the images themselves, plus the guard that
 #            the stack refuses to start without its secrets
 #
@@ -20,7 +23,8 @@
 #   * a downloadable artifact (the JUnit XML and that markdown)
 #   * a comment on the pull request, updated in place on every push
 # .github/scripts/test-summary.mjs builds the markdown out of the JUnit XML that
-# `node --test` writes with its built-in reporter.
+# `node --test` and Playwright both write; .github/scripts/pr-comment.sh posts
+# it, one comment per report, marked so the jobs never overwrite each other.
 # ---------------------------------------------------------------------------
 name: CI
 
@@ -38,6 +42,29 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    name: Lint and format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install the tooling
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Prettier
+        run: npm run format:check
+
   site:
     name: Site (typecheck + static export)
     runs-on: ubuntu-latest
@@ -172,9 +199,106 @@ jobs:
             printf '\n[Full log and artifacts](%s/%s/actions/runs/%s)\n' \
               "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
           } > test-results/comment.md
-          # One comment per pull request, updated in place instead of one per push.
-          gh pr comment "$PR" --edit-last --body-file test-results/comment.md \
-            || gh pr comment "$PR" --body-file test-results/comment.md
+          bash .github/scripts/pr-comment.sh cv-ci-report:unit test-results/comment.md
+
+  e2e:
+    name: End to end (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      # Only for the report comment; a fork gets a read-only token, and the step
+      # is allowed to fail there.
+      pull-requests: write
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: cv_chat_test
+          MYSQL_USER: chat
+          MYSQL_PASSWORD: chat
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_NAME: cv_chat_test
+      DB_USER: chat
+      DB_PASSWORD: chat
+      ADMIN_TOKEN: ci-admin-token
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            cv/package-lock.json
+            chat-backend/package-lock.json
+
+      - name: Install the tooling and the backend
+        run: |
+          npm ci
+          npm ci --prefix chat-backend
+
+      - name: Install the site dependencies
+        run: npm ci --prefix cv
+
+      # The tests serve the real export, the way nginx does in production.
+      - name: Build the static export
+        run: npm --prefix cv run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: npx playwright test
+
+      # The report steps run even when the tests failed - that is the point of a
+      # report - and none of them may fail the job: the step above decides.
+      - name: Test report (run summary + pull request body)
+        if: always()
+        run: |
+          node .github/scripts/test-summary.mjs test-results/playwright-junit.xml \
+            --title "End to end (Chromium)" \
+            --out test-results/summary.md
+
+      - name: Test report (artifact)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Test report (pull request comment)
+        if: always() && github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.number }}
+        run: |
+          {
+            cat test-results/summary.md 2>/dev/null \
+              || printf '## 🧪 End to end\n\n⚠️ The report could not be generated - see the job log.\n'
+            printf '\n[Full log, traces and screenshots](%s/%s/actions/runs/%s)\n' \
+              "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+          } > test-results/comment.md
+          bash .github/scripts/pr-comment.sh cv-ci-report:e2e test-results/comment.md
 
   docker:
     name: Compose files and images

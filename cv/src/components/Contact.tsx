@@ -1,8 +1,8 @@
 'use client';
 
-import {useText} from './ContentProvider';
+import { useText } from './ContentProvider';
 import Reveal from './Reveal';
-import {Mail} from './icons';
+import { Mail } from './icons';
 
 export default function Contact() {
   const subtitle = useText('contact.subtitle');
@@ -16,9 +16,7 @@ export default function Contact() {
           <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">
             {subtitle}
           </p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-            {title}
-          </h2>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h2>
         </Reveal>
 
         <Reveal delay={0.1}>

@@ -58,10 +58,13 @@ export function readSubscription(input) {
   if (!/^https:\/\//.test(endpoint)) return null;
   if (!isBase64Url(p256dh) || !isBase64Url(auth)) return null;
 
-  return {endpoint, p256dh, auth};
+  return { endpoint, p256dh, auth };
 }
 
-export async function saveSubscription(pool, {audience, conversationId, subscription, userAgent}) {
+export async function saveSubscription(
+  pool,
+  { audience, conversationId, subscription, userAgent },
+) {
   await pool.query(
     `INSERT INTO push_subscriptions (endpoint, p256dh, auth, audience, conversation_id, user_agent)
      VALUES (?, ?, ?, ?, ?, ?)
@@ -85,7 +88,7 @@ export async function saveSubscription(pool, {audience, conversationId, subscrip
 // Returns the number of removed rows. The visitor may only remove a
 // subscription that belongs to their own conversation, the admin only their
 // own audience.
-export async function deleteSubscription(pool, {audience, conversationId, endpoint}) {
+export async function deleteSubscription(pool, { audience, conversationId, endpoint }) {
   const [result] = await pool.query(
     `DELETE FROM push_subscriptions
       WHERE audience = ? AND endpoint = ?
@@ -115,7 +118,9 @@ export async function listSubscriptions(pool, audience) {
 }
 
 function truncate(body) {
-  const text = String(body ?? '').replace(/\s+/g, ' ').trim();
+  const text = String(body ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
   return text.length > MAX_BODY_LENGTH ? `${text.slice(0, MAX_BODY_LENGTH - 1)}…` : text;
 }
 
@@ -128,14 +133,15 @@ async function deliver(pool, rows, payload) {
     rows.map(async (row) => {
       try {
         await webpush.sendNotification(
-          {endpoint: row.endpoint, keys: {p256dh: row.p256dh, auth: row.auth}},
+          { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } },
           body,
-          {TTL: 3600, urgency: 'high'},
+          { TTL: 3600, urgency: 'high' },
         );
         sent += 1;
-        await pool.query('UPDATE push_subscriptions SET last_success_at = CURRENT_TIMESTAMP WHERE id = ?', [
-          row.id,
-        ]);
+        await pool.query(
+          'UPDATE push_subscriptions SET last_success_at = CURRENT_TIMESTAMP WHERE id = ?',
+          [row.id],
+        );
       } catch (error) {
         failed += 1;
         // 404/410 mean the browser dropped the subscription for good.
@@ -146,15 +152,20 @@ async function deliver(pool, rows, payload) {
           return;
         }
 
-        console.error(`[push] delivery failed (${error?.statusCode ?? 'no status'}):`, error?.message);
+        console.error(
+          `[push] delivery failed (${error?.statusCode ?? 'no status'}):`,
+          error?.message,
+        );
         await pool
-          .query('UPDATE push_subscriptions SET last_error_at = CURRENT_TIMESTAMP WHERE id = ?', [row.id])
+          .query('UPDATE push_subscriptions SET last_error_at = CURRENT_TIMESTAMP WHERE id = ?', [
+            row.id,
+          ])
           .catch(() => undefined);
       }
     }),
   );
 
-  return {sent, failed};
+  return { sent, failed };
 }
 
 async function subscriptionsFor(pool, audience, conversationId) {
@@ -168,11 +179,11 @@ async function subscriptionsFor(pool, audience, conversationId) {
 
 // Fire-and-forget on purpose: a push problem must never fail the API call that
 // triggered it.
-export async function notifyAdmins(pool, {conversationId, message, texts}) {
-  if (!ENABLED) return {sent: 0, failed: 0};
+export async function notifyAdmins(pool, { conversationId, message, texts }) {
+  if (!ENABLED) return { sent: 0, failed: 0 };
 
   const rows = await subscriptionsFor(pool, 'admin', null);
-  if (!rows.length) return {sent: 0, failed: 0};
+  if (!rows.length) return { sent: 0, failed: 0 };
 
   return deliver(pool, rows, {
     title: texts.adminTitle,
@@ -182,11 +193,11 @@ export async function notifyAdmins(pool, {conversationId, message, texts}) {
   });
 }
 
-export async function notifyVisitor(pool, {conversationId, message, texts}) {
-  if (!ENABLED) return {sent: 0, failed: 0};
+export async function notifyVisitor(pool, { conversationId, message, texts }) {
+  if (!ENABLED) return { sent: 0, failed: 0 };
 
   const rows = await subscriptionsFor(pool, 'visitor', conversationId);
-  if (!rows.length) return {sent: 0, failed: 0};
+  if (!rows.length) return { sent: 0, failed: 0 };
 
   return deliver(pool, rows, {
     title: texts.replyTitle,
@@ -196,11 +207,11 @@ export async function notifyVisitor(pool, {conversationId, message, texts}) {
   });
 }
 
-export async function notifyAdminsTest(pool, {texts}) {
-  if (!ENABLED) return {sent: 0, failed: 0};
+export async function notifyAdminsTest(pool, { texts }) {
+  if (!ENABLED) return { sent: 0, failed: 0 };
 
   const rows = await subscriptionsFor(pool, 'admin', null);
-  if (!rows.length) return {sent: 0, failed: 0};
+  if (!rows.length) return { sent: 0, failed: 0 };
 
   return deliver(pool, rows, {
     title: texts.testTitle,

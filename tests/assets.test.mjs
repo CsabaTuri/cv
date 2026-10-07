@@ -7,11 +7,11 @@
 // outside its subnet, a missing mandatory variable).
 
 import assert from 'node:assert/strict';
-import {execFileSync} from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import {describe, it} from 'node:test';
-import {REPO_DIR} from './helpers.mjs';
+import { describe, it } from 'node:test';
+import { REPO_DIR } from './helpers.mjs';
 
 const read = (...parts) => fs.readFileSync(path.join(REPO_DIR, ...parts), 'utf8');
 const exists = (...parts) => fs.existsSync(path.join(REPO_DIR, ...parts));
@@ -27,7 +27,7 @@ const envExample = read('.env.example');
 function pngSize(file) {
   const buffer = fs.readFileSync(file);
   assert.equal(buffer.subarray(1, 4).toString(), 'PNG', `${file} is a PNG`);
-  return {width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20)};
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
 }
 
 // Comments mention `${VAR:?}` as an example; only real directives count.
@@ -67,7 +67,7 @@ describe('PWA manifest', () => {
     assert.ok(sizes.includes('512x512'), 'has a 512px icon');
     assert.ok(
       manifest.icons.some((icon) => icon.purpose === 'maskable'),
-      'has a maskable icon'
+      'has a maskable icon',
     );
   });
 
@@ -77,7 +77,7 @@ describe('PWA manifest', () => {
       assert.ok(fs.existsSync(file), `${icon.src} exists`);
 
       const [width, height] = icon.sizes.split('x').map(Number);
-      assert.deepEqual(pngSize(file), {width, height}, `${icon.src} is ${icon.sizes}`);
+      assert.deepEqual(pngSize(file), { width, height }, `${icon.src} is ${icon.sizes}`);
     }
 
     assert.deepEqual(pngSize(path.join(REPO_DIR, 'cv', 'public', 'apple-touch-icon.png')), {
@@ -97,7 +97,9 @@ describe('PWA manifest', () => {
 
 describe('service worker', () => {
   it('parses', () => {
-    assert.doesNotThrow(() => execFileSync(process.execPath, ['--check', path.join(REPO_DIR, 'cv', 'public', 'sw.js')]));
+    assert.doesNotThrow(() =>
+      execFileSync(process.execPath, ['--check', path.join(REPO_DIR, 'cv', 'public', 'sw.js')]),
+    );
   });
 
   it('handles offline shell and push', () => {
@@ -128,7 +130,7 @@ describe('nginx rules', () => {
 
 describe('compose invariants', () => {
   it('never tags an image with latest', () => {
-    for (const [name, text] of Object.entries({compose, composeProd, composeDev})) {
+    for (const [name, text] of Object.entries({ compose, composeProd, composeDev })) {
       assert.ok(!/:latest\b/.test(text), `${name} has no :latest tag`);
       assert.ok(!/:-latest\}/.test(text), `${name} has no latest default`);
     }
@@ -187,7 +189,8 @@ describe('environment template', () => {
     const composeText = stripComments(`${compose}\n${composeProd}\n${composeDev}`);
 
     const stale = declared.filter(
-      (variable) => !composeText.includes(`\${${variable}`) && !composeText.includes(`${variable}:`)
+      (variable) =>
+        !composeText.includes(`\${${variable}`) && !composeText.includes(`${variable}:`),
     );
     assert.deepEqual(stale, [], 'every documented variable is used by the stack');
   });

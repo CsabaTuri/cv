@@ -35,24 +35,26 @@ const ASSET_PATTERN = /\.(?:css|js|mjs|jpg|jpeg|gif|png|svg|ico|webp|avif|woff2?
 // without them an offline load would show the shell with no styles or scripts.
 async function warmUpShell() {
   const cache = await caches.open(SHELL_CACHE);
-  const response = await fetch('/', {cache: 'reload'});
+  const response = await fetch('/', { cache: 'reload' });
   if (!response.ok) return;
   await cache.put('/', response.clone());
 
   const html = await response.text();
-  const urls = new Set([...html.matchAll(/(?:src|href)="(\/_next\/[^"]+)"/g)].map((match) => match[1]));
+  const urls = new Set(
+    [...html.matchAll(/(?:src|href)="(\/_next\/[^"]+)"/g)].map((match) => match[1]),
+  );
   if (!urls.size) return;
 
   const assets = await caches.open(ASSET_CACHE);
   await Promise.all(
     [...urls].map(async (url) => {
       try {
-        const asset = await fetch(url, {cache: 'reload'});
+        const asset = await fetch(url, { cache: 'reload' });
         if (asset.ok) await assets.put(url, asset);
       } catch {
         // A missing asset only costs offline polish, never the online site.
       }
-    })
+    }),
   );
 }
 
@@ -60,10 +62,12 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(SHELL_CACHE);
-      await Promise.allSettled(SHELL_URLS.map((url) => cache.add(new Request(url, {cache: 'reload'}))));
+      await Promise.allSettled(
+        SHELL_URLS.map((url) => cache.add(new Request(url, { cache: 'reload' }))),
+      );
       await warmUpShell();
       await self.skipWaiting();
-    })()
+    })(),
   );
 });
 
@@ -74,12 +78,12 @@ self.addEventListener('activate', (event) => {
       const names = await caches.keys();
       await Promise.all(names.filter((name) => !keep.has(name)).map((name) => caches.delete(name)));
       await self.clients.claim();
-    })()
+    })(),
   );
 });
 
 self.addEventListener('fetch', (event) => {
-  const {request} = event;
+  const { request } = event;
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
@@ -100,7 +104,7 @@ self.addEventListener('fetch', (event) => {
         } catch {
           return (await caches.match(request)) || (await caches.match('/')) || Response.error();
         }
-      })()
+      })(),
     );
     return;
   }
@@ -118,7 +122,7 @@ self.addEventListener('fetch', (event) => {
         cache.put(request, response.clone());
       }
       return response;
-    })()
+    })(),
   );
 });
 
@@ -129,7 +133,7 @@ self.addEventListener('push', (event) => {
   try {
     payload = event.data ? event.data.json() : {};
   } catch {
-    payload = {body: event.data ? event.data.text() : ''};
+    payload = { body: event.data ? event.data.text() : '' };
   }
 
   const title = payload.title || 'Értesítés';
@@ -141,8 +145,8 @@ self.addEventListener('push', (event) => {
       tag: payload.tag || 'cv-chat',
       renotify: true,
       requireInteraction: false,
-      data: {url: payload.url || '/'},
-    })
+      data: { url: payload.url || '/' },
+    }),
   );
 });
 
@@ -153,7 +157,7 @@ self.addEventListener('notificationclick', (event) => {
 
   event.waitUntil(
     (async () => {
-      const clients = await self.clients.matchAll({type: 'window', includeUncontrolled: true});
+      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       const samePage = clients.find((client) => client.url.split('#')[0] === target);
       if (samePage) return samePage.focus();
 
@@ -164,6 +168,6 @@ self.addEventListener('notificationclick', (event) => {
       }
 
       return self.clients.openWindow(target);
-    })()
+    })(),
   );
 });

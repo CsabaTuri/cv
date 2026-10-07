@@ -1,7 +1,7 @@
 'use client';
 
-import {useCallback, useEffect, useRef, useState} from 'react';
-import {Send} from './icons';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Send } from './icons';
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_MESSAGE_LENGTH = 4000;
@@ -53,10 +53,7 @@ export default function ChatInbox({
   const activeRef = useRef<string | null>(null);
   const thread = useRef<HTMLDivElement>(null);
 
-  const authHeaders = useCallback(
-    (value: string) => ({Authorization: `Bearer ${value}`}),
-    [],
-  );
+  const authHeaders = useCallback((value: string) => ({ Authorization: `Bearer ${value}` }), []);
 
   const loadConversations = useCallback(
     async (value: string) => {
@@ -73,7 +70,7 @@ export default function ChatInbox({
         return;
       }
 
-      const data: {conversations?: Conversation[]} | null = await response
+      const data: { conversations?: Conversation[] } | null = await response
         .json()
         .catch(() => null);
       setConversations(data?.conversations ?? []);
@@ -86,7 +83,7 @@ export default function ChatInbox({
     async (value: string, id: string) => {
       const response = await fetch(
         `/api/admin/conversations/${encodeURIComponent(id)}/messages?afterId=0`,
-        {headers: {Authorization: `Bearer ${value}`}},
+        { headers: { Authorization: `Bearer ${value}` } },
       );
       if (response.status === 401) {
         onUnauthorized();
@@ -94,9 +91,7 @@ export default function ChatInbox({
       }
       if (!response.ok) return;
 
-      const data: {messages?: Message[]} | null = await response
-        .json()
-        .catch(() => null);
+      const data: { messages?: Message[] } | null = await response.json().catch(() => null);
       setMessages(data?.messages ?? []);
     },
     [onUnauthorized],
@@ -122,7 +117,7 @@ export default function ChatInbox({
   }, [token, loadConversations, loadMessages]);
 
   useEffect(() => {
-    thread.current?.scrollTo({top: thread.current.scrollHeight});
+    thread.current?.scrollTo({ top: thread.current.scrollHeight });
   }, [messages]);
 
   function openConversation(id: string) {
@@ -143,8 +138,8 @@ export default function ChatInbox({
         `/api/admin/conversations/${encodeURIComponent(activeRef.current)}/reply`,
         {
           method: 'POST',
-          headers: {'Content-Type': 'application/json', ...authHeaders(token)},
-          body: JSON.stringify({message: text}),
+          headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
+          body: JSON.stringify({ message: text }),
         },
       );
 
@@ -173,7 +168,9 @@ export default function ChatInbox({
       <div className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[20rem_1fr]">
         <aside className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
           {conversations.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-gray-500">Még nincs üzenet.</p>
+            <p className="px-4 py-6 text-sm text-gray-500" data-testid="inbox-empty">
+              Még nincs üzenet.
+            </p>
           ) : (
             <ul className="max-h-[70vh] divide-y divide-gray-100 overflow-y-auto">
               {conversations.map((item) => (
@@ -181,6 +178,7 @@ export default function ChatInbox({
                   <button
                     type="button"
                     onClick={() => openConversation(item.id)}
+                    data-testid="conversation"
                     className={`w-full px-4 py-3 text-left transition-colors hover:bg-gray-50 ${
                       item.id === activeId ? 'bg-indigo-50' : ''
                     }`}
@@ -198,7 +196,10 @@ export default function ChatInbox({
                       {item.lastMessage?.body}
                     </p>
                     {item.unread > 0 && (
-                      <span className="mt-2 inline-flex rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+                      <span
+                        className="mt-2 inline-flex rounded-full bg-indigo-600 px-2 py-0.5 text-[11px] font-semibold text-white"
+                        data-testid="unread"
+                      >
                         {item.unread} új
                       </span>
                     )}
@@ -211,7 +212,7 @@ export default function ChatInbox({
 
         <section className="flex min-h-[70vh] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white">
           {!active ? (
-            <p className="m-auto px-6 py-16 text-sm text-gray-500">
+            <p className="m-auto px-6 py-16 text-sm text-gray-500" data-testid="inbox-no-selection">
               Válassz egy látogatót.
             </p>
           ) : (
@@ -222,24 +223,19 @@ export default function ChatInbox({
                     #{active.number} · {active.visitorIp ?? 'ismeretlen IP'}
                   </p>
                   <p className="text-xs text-gray-500">
-                    Indult: {formatTimestamp(active.createdAt)} ·{' '}
-                    {active.messageCount} üzenet
+                    Indult: {formatTimestamp(active.createdAt)} · {active.messageCount} üzenet
                   </p>
                 </div>
-                <span className="text-[11px] text-gray-400">
-                  {active.id.slice(0, 8)}
-                </span>
+                <span className="text-[11px] text-gray-400">{active.id.slice(0, 8)}</span>
               </header>
 
               <div ref={thread} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
                 {messages.map((message) => (
                   <div
                     key={message.id}
-                    className={
-                      message.role === 'admin'
-                        ? 'flex justify-end'
-                        : 'flex justify-start'
-                    }
+                    data-testid="inbox-message"
+                    data-role={message.role}
+                    className={message.role === 'admin' ? 'flex justify-end' : 'flex justify-start'}
                   >
                     <div
                       className={
@@ -251,9 +247,7 @@ export default function ChatInbox({
                       <p className="whitespace-pre-wrap">{message.body}</p>
                       <p
                         className={`mt-1 text-[10px] ${
-                          message.role === 'admin'
-                            ? 'text-indigo-100'
-                            : 'text-gray-400'
+                          message.role === 'admin' ? 'text-indigo-100' : 'text-gray-400'
                         }`}
                       >
                         {formatTimestamp(message.createdAt)}
@@ -273,6 +267,7 @@ export default function ChatInbox({
                   onChange={(event) => setReply(event.target.value)}
                   placeholder="Írd meg a választ…"
                   aria-label="Válasz"
+                  data-testid="reply-input"
                   maxLength={MAX_MESSAGE_LENGTH}
                   className="min-w-0 flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none placeholder:text-gray-400 focus:border-indigo-400"
                 />
@@ -280,6 +275,7 @@ export default function ChatInbox({
                   type="submit"
                   disabled={!reply.trim() || sending}
                   aria-label="Válasz küldése"
+                  data-testid="reply-send"
                   className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Send className="h-4 w-4" />

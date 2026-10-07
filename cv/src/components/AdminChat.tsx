@@ -1,11 +1,11 @@
 'use client';
 
-import {useEffect, useState} from 'react';
+import { useEffect, useState } from 'react';
 import ChatInbox from './ChatInbox';
 import ContentEditor from './ContentEditor';
 import DeployPanel from './DeployPanel';
-import {usePush} from './usePush';
-import {Bell, BellOff} from './icons';
+import { usePush } from './usePush';
+import { Bell, BellOff } from './icons';
 
 const TOKEN_KEY = 'cv-chat-admin-token';
 
@@ -28,8 +28,7 @@ export default function AdminChat() {
       unsupported: 'Ez a böngésző nem támogatja az értesítéseket.',
       insecure: 'Az értesítés csak HTTPS-en (vagy localhoston) működik.',
       failed: 'Nem sikerült az értesítés művelet.',
-      sent: (sent, failed) =>
-        failed ? `Elküldve: ${sent}, hiba: ${failed}` : `Elküldve: ${sent}`,
+      sent: (sent, failed) => (failed ? `Elküldve: ${sent}, hiba: ${failed}` : `Elküldve: ${sent}`),
     },
   });
   const [error, setError] = useState<string | null>(null);
@@ -85,17 +84,22 @@ export default function AdminChat() {
             onChange={(event) => setTokenInput(event.target.value)}
             placeholder="Admin token"
             aria-label="Admin token"
+            data-testid="admin-token"
+            // The whole page is this one form, so landing in the field is what
+            // the visitor wants; the rule guards against it on content pages.
+            // eslint-disable-next-line jsx-a11y/no-autofocus
             autoFocus
             className="mt-4 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-400"
           />
           <button
             type="submit"
+            data-testid="admin-login"
             className="mt-3 w-full rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-indigo-500"
           >
             Belépés
           </button>
           {error && (
-            <p role="alert" className="mt-3 text-sm text-red-600">
+            <p role="alert" data-testid="admin-error" className="mt-3 text-sm text-red-600">
               {error}
             </p>
           )}
@@ -121,17 +125,28 @@ export default function AdminChat() {
           </div>
 
           <nav className="flex items-center gap-2">
-            <button type="button" onClick={() => setTab('inbox')} className={tabClass('inbox')}>
+            <button
+              type="button"
+              onClick={() => setTab('inbox')}
+              data-testid="tab-inbox"
+              className={tabClass('inbox')}
+            >
               Üzenetek
             </button>
             <button
               type="button"
               onClick={() => setTab('content')}
+              data-testid="tab-content"
               className={tabClass('content')}
             >
               Szövegek
             </button>
-            <button type="button" onClick={() => setTab('build')} className={tabClass('build')}>
+            <button
+              type="button"
+              onClick={() => setTab('build')}
+              data-testid="tab-build"
+              className={tabClass('build')}
+            >
               Build
             </button>
           </nav>
@@ -143,6 +158,7 @@ export default function AdminChat() {
               disabled={push.disabled}
               aria-pressed={push.state === 'on'}
               title={push.label}
+              data-testid="admin-push"
               className={
                 push.state === 'on'
                   ? 'inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-500 disabled:opacity-50'
@@ -162,6 +178,7 @@ export default function AdminChat() {
                 type="button"
                 onClick={() => void push.test()}
                 disabled={push.busy}
+                data-testid="admin-push-test"
                 className="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-900 disabled:opacity-50"
               >
                 Teszt
@@ -171,6 +188,7 @@ export default function AdminChat() {
             <button
               type="button"
               onClick={signOut}
+              data-testid="admin-signout"
               className="rounded-full border border-gray-300 px-4 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-900"
             >
               Kilépés
@@ -179,9 +197,7 @@ export default function AdminChat() {
         </div>
       </header>
 
-      {error && (
-        <p className="mx-auto max-w-7xl px-6 pt-4 text-sm text-red-600">{error}</p>
-      )}
+      {error && <p className="mx-auto max-w-7xl px-6 pt-4 text-sm text-red-600">{error}</p>}
 
       {push.message && (
         <p className="mx-auto max-w-7xl px-6 pt-4 text-sm text-gray-600">{push.message}</p>

@@ -1,6 +1,6 @@
 'use client';
 
-import {useText} from './ContentProvider';
+import { useText } from './ContentProvider';
 
 export default function Footer() {
   const siteName = useText('site.name');

@@ -1,8 +1,8 @@
 'use client';
 
-import {useEffect, useState} from 'react';
-import {useText} from './ContentProvider';
-import {Menu, X} from './icons';
+import { useEffect, useState } from 'react';
+import { useText } from './ContentProvider';
+import { Menu, X } from './icons';
 
 export default function Navbar() {
   const siteName = useText('site.name');
@@ -15,10 +15,10 @@ export default function Navbar() {
   const closeMenuLabel = useText('a11y.closeMenu');
 
   const links = [
-    {href: '#about', label: about},
-    {href: '#skills', label: skills},
-    {href: '#experience', label: experience},
-    {href: '#contact', label: contact},
+    { href: '#about', label: about },
+    { href: '#skills', label: skills },
+    { href: '#experience', label: experience },
+    { href: '#contact', label: contact },
   ];
 
   const [scrolled, setScrolled] = useState(false);
@@ -27,16 +27,14 @@ export default function Navbar() {
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
     onScroll();
-    window.addEventListener('scroll', onScroll, {passive: true});
+    window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   return (
     <header
       className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? 'border-b border-gray-200/60 bg-white/80 backdrop-blur-md'
-          : 'bg-transparent'
+        scrolled ? 'border-b border-gray-200/60 bg-white/80 backdrop-blur-md' : 'bg-transparent'
       }`}
     >
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">

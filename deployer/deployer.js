@@ -19,8 +19,8 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-const {spawn} = require('node:child_process');
-const {timingSafeEqual} = require('node:crypto');
+const { spawn } = require('node:child_process');
+const { timingSafeEqual } = require('node:crypto');
 
 const PORT = Number(process.env.PORT || 4000);
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
@@ -29,6 +29,8 @@ const PROJECT_DIR = process.env.PROJECT_DIR || '/workspace';
 const STATE_FILE = path.join(process.env.STATE_DIR || '/state', 'last-build.json');
 const BUILD_TIMEOUT_MS = Number(process.env.DEPLOY_TIMEOUT_MS || 900000);
 const MAX_LOG_LINES = 500;
+// Strips the colour codes out of the compose log before it reaches the panel.
+// eslint-disable-next-line no-control-regex -- the ESC byte is the point here
 const ANSI = /\u001b\[[0-9;?]*[ -/]*[@-~]/g;
 const SERVICE_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 
@@ -80,7 +82,7 @@ function restore() {
   try {
     const stored = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
     if (stored && typeof stored === 'object') {
-      run = {...run, ...stored, services: SERVICES};
+      run = { ...run, ...stored, services: SERVICES };
       // A build cannot survive the process that started it, so a stored
       // `running` state means the helper was restarted mid-build.
       if (run.state === 'running') {
@@ -196,7 +198,7 @@ function startBuild() {
     log(
       code === 0
         ? `Kész (${elapsedSeconds()} s).`
-        : `Sikertelen: kilépési kód ${code === null ? `nincs (${signal})` : code}.`
+        : `Sikertelen: kilépési kód ${code === null ? `nincs (${signal})` : code}.`,
     );
     persist();
 
@@ -218,41 +220,43 @@ function currentStatus() {
     exitCode: run.exitCode,
     services: run.services,
     durationMs: start === null ? null : end - start,
-    composeFiles: String(process.env.COMPOSE_FILE || '').split(':').filter(Boolean),
+    composeFiles: String(process.env.COMPOSE_FILE || '')
+      .split(':')
+      .filter(Boolean),
     lines: run.lines,
   };
 }
 
 const server = http.createServer((req, res) => {
-  const {pathname} = new URL(req.url, 'http://localhost');
+  const { pathname } = new URL(req.url, 'http://localhost');
 
   // Unauthenticated on purpose: used by the container healthcheck.
   if (pathname === '/api/deploy/health') {
-    return send(res, 200, {ok: true, enabled: ENABLED, state: run.state});
+    return send(res, 200, { ok: true, enabled: ENABLED, state: run.state });
   }
 
   if (pathname === '/api/deploy/status' && (req.method === 'GET' || req.method === 'HEAD')) {
-    if (!authorized(req)) return send(res, 401, {error: 'unauthorized'});
+    if (!authorized(req)) return send(res, 401, { error: 'unauthorized' });
     return send(res, 200, currentStatus());
   }
 
   if (pathname === '/api/deploy/run' && req.method === 'POST') {
-    if (!authorized(req)) return send(res, 401, {error: 'unauthorized'});
+    if (!authorized(req)) return send(res, 401, { error: 'unauthorized' });
     if (!ENABLED) {
-      return send(res, 503, {error: 'disabled'});
+      return send(res, 503, { error: 'disabled' });
     }
     if (!SERVICES.length) {
-      return send(res, 500, {error: 'no_services'});
+      return send(res, 500, { error: 'no_services' });
     }
     if (run.state === 'running') {
-      return send(res, 409, {error: 'busy', startedAt: run.startedAt});
+      return send(res, 409, { error: 'busy', startedAt: run.startedAt });
     }
 
     startBuild();
-    return send(res, 202, {started: true, startedAt: run.startedAt, services: SERVICES});
+    return send(res, 202, { started: true, startedAt: run.startedAt, services: SERVICES });
   }
 
-  return send(res, 404, {error: 'not_found'});
+  return send(res, 404, { error: 'not_found' });
 });
 
 server.keepAliveTimeout = 65000;
@@ -279,7 +283,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 function prepareEnvFile() {
   try {
-    fs.mkdirSync(path.dirname(ENV_FILE), {recursive: true});
+    fs.mkdirSync(path.dirname(ENV_FILE), { recursive: true });
     fs.writeFileSync(ENV_FILE, '');
   } catch (error) {
     console.error(`deployer: cannot prepare ${ENV_FILE}: ${error.message}`);
@@ -290,6 +294,6 @@ prepareEnvFile();
 restore();
 server.listen(PORT, () => {
   console.log(
-    `deployer: listening on ${PORT}, enabled=${ENABLED}, services=[${SERVICES.join(' ')}]`
+    `deployer: listening on ${PORT}, enabled=${ENABLED}, services=[${SERVICES.join(' ')}]`,
   );
 });

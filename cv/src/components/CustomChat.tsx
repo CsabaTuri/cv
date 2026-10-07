@@ -1,9 +1,9 @@
 'use client';
 
-import {useCallback, useEffect, useRef, useState} from 'react';
-import {useText} from './ContentProvider';
-import {usePush} from './usePush';
-import {Bell, BellOff, MessageCircle, Send, X} from './icons';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useText } from './ContentProvider';
+import { usePush } from './usePush';
+import { Bell, BellOff, MessageCircle, Send, X } from './icons';
 
 // Same-origin: nginx proxies /api/ to the chat-backend service (see nginx.conf).
 const API_BASE = '/api/chat';
@@ -100,7 +100,7 @@ export default function CustomChat() {
       );
       if (!response.ok) return;
 
-      const data: {messages?: ChatMessage[]; cursor?: number} | null = await response
+      const data: { messages?: ChatMessage[]; cursor?: number } | null = await response
         .json()
         .catch(() => null);
       const incoming = Array.isArray(data?.messages) ? data.messages : [];
@@ -122,7 +122,7 @@ export default function CustomChat() {
   }, [open, refresh]);
 
   useEffect(() => {
-    log.current?.scrollTo({top: log.current.scrollHeight});
+    log.current?.scrollTo({ top: log.current.scrollHeight });
   }, [messages, sending, open]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -138,12 +138,12 @@ export default function CustomChat() {
     try {
       const response = await fetch(API_BASE, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({sessionId: session.current, message: text}),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: session.current, message: text }),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      const data: {sessionId?: string; message?: ChatMessage} | null = await response
+      const data: { sessionId?: string; message?: ChatMessage } | null = await response
         .json()
         .catch(() => null);
 
@@ -163,8 +163,7 @@ export default function CustomChat() {
     }
   }
 
-  const waiting =
-    messages.length > 0 && messages[messages.length - 1].role === 'visitor';
+  const waiting = messages.length > 0 && messages[messages.length - 1].role === 'visitor';
 
   return (
     <>
@@ -174,6 +173,7 @@ export default function CustomChat() {
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-label={open ? closeLabel : openLabel}
+        data-testid="chat-toggle"
         className="fixed bottom-5 right-5 z-40 inline-flex h-12 w-12 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg transition-colors hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
       >
         {open ? <X className="h-5 w-5" /> : <MessageCircle className="h-5 w-5" />}
@@ -183,17 +183,14 @@ export default function CustomChat() {
         <div
           role="dialog"
           aria-label={title}
+          data-testid="chat-panel"
           className="fixed bottom-20 right-4 z-40 flex h-[26rem] max-h-[70vh] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
         >
           <header className="flex items-start justify-between gap-3 border-b border-gray-200 px-4 py-3">
             <div>
               <p className="text-sm font-semibold">{title}</p>
-              <p className="text-xs text-gray-500">
-                {subtitle}
-              </p>
-              {push.state === 'on' && (
-                <p className="text-xs text-emerald-600">{notifyOn}</p>
-              )}
+              <p className="text-xs text-gray-500">{subtitle}</p>
+              {push.state === 'on' && <p className="text-xs text-emerald-600">{notifyOn}</p>}
               {push.message && <p className="text-xs text-amber-700">{push.message}</p>}
             </div>
             <div className="flex shrink-0 items-center gap-1">
@@ -203,6 +200,7 @@ export default function CustomChat() {
                 disabled={push.disabled}
                 aria-pressed={push.state === 'on'}
                 aria-label={push.label}
+                data-testid="chat-push"
                 title={push.label}
                 className={
                   push.state === 'on'
@@ -210,12 +208,17 @@ export default function CustomChat() {
                     : 'inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50'
                 }
               >
-                {push.state === 'on' ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+                {push.state === 'on' ? (
+                  <Bell className="h-4 w-4" />
+                ) : (
+                  <BellOff className="h-4 w-4" />
+                )}
               </button>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label={closeLabel}
+                data-testid="chat-close"
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
               >
                 <X className="h-4 w-4" />
@@ -226,7 +229,10 @@ export default function CustomChat() {
           <div ref={log} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
             {messages.length === 0 && (
               <div className="flex justify-start">
-                <p className="max-w-[85%] rounded-2xl rounded-bl-sm bg-gray-100 px-3.5 py-2 text-sm text-gray-800">
+                <p
+                  className="max-w-[85%] rounded-2xl rounded-bl-sm bg-gray-100 px-3.5 py-2 text-sm text-gray-800"
+                  data-testid="chat-greeting"
+                >
                   {greeting}
                 </p>
               </div>
@@ -235,11 +241,9 @@ export default function CustomChat() {
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={
-                  message.role === 'visitor'
-                    ? 'flex justify-end'
-                    : 'flex justify-start'
-                }
+                data-testid="chat-message"
+                data-role={message.role}
+                className={message.role === 'visitor' ? 'flex justify-end' : 'flex justify-start'}
               >
                 <p
                   className={
@@ -254,11 +258,13 @@ export default function CustomChat() {
             ))}
 
             {(sending || waiting) && (
-              <p className="text-xs text-gray-500">{waitingLabel}</p>
+              <p className="text-xs text-gray-500" data-testid="chat-waiting">
+                {waitingLabel}
+              </p>
             )}
 
             {failed && (
-              <p role="alert" className="text-xs text-red-600">
+              <p role="alert" data-testid="chat-error" className="text-xs text-red-600">
                 {errorLabel}
               </p>
             )}
@@ -274,6 +280,7 @@ export default function CustomChat() {
               onChange={(event) => setInput(event.target.value)}
               placeholder={placeholder}
               aria-label={placeholder}
+              data-testid="chat-input"
               maxLength={MAX_MESSAGE_LENGTH}
               className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none placeholder:text-gray-400 focus:border-indigo-400"
             />
@@ -281,6 +288,7 @@ export default function CustomChat() {
               type="submit"
               disabled={!input.trim() || sending}
               aria-label={sendLabel}
+              data-testid="chat-send"
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white transition-colors hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Send className="h-4 w-4" />

@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 /** Shown until a value for the key exists in the database. */
 const PLACEHOLDER = '…';
@@ -18,7 +12,7 @@ const ContentContext = createContext<Record<string, string>>({});
  * the admin page). Nothing is baked into the components: while the fetch is in
  * flight — or when a key has not been provided yet — the placeholder shows.
  */
-export function ContentProvider({children}: {children: ReactNode}) {
+export function ContentProvider({ children }: { children: ReactNode }) {
   const [content, setContent] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -29,7 +23,7 @@ export function ContentProvider({children}: {children: ReactNode}) {
         const response = await fetch('/api/content');
         if (!response.ok) return;
 
-        const data: {content?: Record<string, string>} | null = await response
+        const data: { content?: Record<string, string> } | null = await response
           .json()
           .catch(() => null);
         if (!cancelled && data?.content) setContent(data.content);
@@ -51,15 +45,11 @@ export function ContentProvider({children}: {children: ReactNode}) {
 
     if (title) document.title = title;
     if (description) {
-      document
-        .querySelector('meta[name="description"]')
-        ?.setAttribute('content', description);
+      document.querySelector('meta[name="description"]')?.setAttribute('content', description);
     }
   }, [content]);
 
-  return (
-    <ContentContext.Provider value={content}>{children}</ContentContext.Provider>
-  );
+  return <ContentContext.Provider value={content}>{children}</ContentContext.Provider>;
 }
 
 /** The stored text for a key, or the placeholder. */

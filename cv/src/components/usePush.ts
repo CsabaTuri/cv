@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback, useEffect, useState} from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   currentSubscription,
   disablePush,
@@ -12,13 +12,7 @@ import {
 } from '@/lib/push';
 
 export type PushState =
-  | 'checking'
-  | 'off'
-  | 'on'
-  | 'blocked'
-  | 'unsupported'
-  | 'insecure'
-  | 'failed';
+  'checking' | 'off' | 'on' | 'blocked' | 'unsupported' | 'insecure' | 'failed';
 
 export interface PushLabels {
   enable: string;
@@ -40,7 +34,7 @@ interface Options {
 
 // Shared logic for the notification switch: the visitor widget and the admin
 // panel each render their own button with it.
-export function usePush({audience, sessionId, token, labels}: Options) {
+export function usePush({ audience, sessionId, token, labels }: Options) {
   const [state, setState] = useState<PushState>('checking');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -79,7 +73,7 @@ export function usePush({audience, sessionId, token, labels}: Options) {
 
     try {
       if (state === 'on') {
-        const result = await disablePush(audience, {sessionId: sessionId ?? undefined, token});
+        const result = await disablePush(audience, { sessionId: sessionId ?? undefined, token });
         if (result.ok) setState('off');
         else setMessage(labels.failed);
         return;
@@ -145,7 +139,12 @@ export function usePush({audience, sessionId, token, labels}: Options) {
     message,
     label,
     // A blocked or unsupported browser cannot be asked again.
-    disabled: busy || state === 'checking' || state === 'blocked' || state === 'unsupported' || state === 'insecure',
+    disabled:
+      busy ||
+      state === 'checking' ||
+      state === 'blocked' ||
+      state === 'unsupported' ||
+      state === 'insecure',
     toggle,
     test,
     canTest: Boolean(token) && state === 'on',

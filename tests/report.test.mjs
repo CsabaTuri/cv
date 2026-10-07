@@ -78,7 +78,7 @@ describe('test report', () => {
   });
 
   it('renders a red report with the totals and the per-suite table', () => {
-    const report = renderReport(parseJUnit(PASSING), {title: 'API (Node 20)'});
+    const report = renderReport(parseJUnit(PASSING), { title: 'API (Node 20)' });
     assert.match(report, /^## 🧪 API \(Node 20\)/);
     assert.match(report, /\*\*❌ 1 test failed\*\* of 5 tests — 3 passed, 1 skipped, 0\.16 s/);
     assert.match(report, /\| visitor chat \| 2 \| 2 \| 0 \| 0 \| 0\.01 s \|/);
@@ -89,10 +89,10 @@ describe('test report', () => {
   });
 
   it('renders an all green report without a failure section', () => {
-    const xml = PASSING.replace(/\t\t<testcase name="handles the push[\s\S]*?<\/testcase>\n/, '').replace(
-      /\t\t<testcase name="skips without a browser"[\s\S]*?<\/testcase>\n/,
+    const xml = PASSING.replace(
+      /\t\t<testcase name="handles the push[\s\S]*?<\/testcase>\n/,
       '',
-    );
+    ).replace(/\t\t<testcase name="skips without a browser"[\s\S]*?<\/testcase>\n/, '');
     const report = renderReport(parseJUnit(xml), {});
     assert.match(report, /\*\*✅ All 3 tests passed\*\* — 0 skipped/);
     assert.ok(!report.includes('### ❌ Failures'), 'a green run has no failure section');
@@ -111,7 +111,7 @@ short body
   it('shows the message of a failure, not the whole stack trace', () => {
     const deep = `<?xml version="1.0"?><testsuites><testsuite name="deep" time="0.1">
 <testcase name="sinks" time="0.1"><failure message="one clear line">
-${Array.from({length: 400}, (_, index) => `frame ${index}`).join('\n')}
+${Array.from({ length: 400 }, (_, index) => `frame ${index}`).join('\n')}
 </failure></testcase></testsuite></testsuites>`;
     const report = renderReport(parseJUnit(deep), {});
     assert.match(report, /one clear line/);
@@ -120,19 +120,25 @@ ${Array.from({length: 400}, (_, index) => `frame ${index}`).join('\n')}
   });
 
   it('says so when a run produced no results at all', () => {
-    const report = renderReport(parseJUnit('<testsuites></testsuites>'), {title: 'API'});
+    const report = renderReport(parseJUnit('<testsuites></testsuites>'), { title: 'API' });
     assert.match(report, /No test results were produced/);
     assert.ok(!report.includes('| Suite |'), 'an empty report has no table');
   });
 
   it('carries the notes about a report that could not be read', () => {
-    const report = renderReport(parseJUnit(PASSING), {title: 'API', notes: ['junit-20.xml: no report was written']});
+    const report = renderReport(parseJUnit(PASSING), {
+      title: 'API',
+      notes: ['junit-20.xml: no report was written'],
+    });
     assert.match(report, /> ⚠️ junit-20\.xml: no report was written/);
     assert.match(report, /\*\*❌ 1 test failed\*\*/);
   });
 
   it('decodes the entities of the runner, not more', () => {
-    assert.equal(decodeEntities('a &amp; b &lt;c&gt; &quot;d&quot; &amp;quot;e&amp;quot;'), 'a & b <c> "d" "e"');
+    assert.equal(
+      decodeEntities('a &amp; b &lt;c&gt; &quot;d&quot; &amp;quot;e&amp;quot;'),
+      'a & b <c> "d" "e"',
+    );
   });
 
   it('writes the Actions summary, the pull request body and prints the report', () => {
@@ -144,7 +150,7 @@ ${Array.from({length: 400}, (_, index) => `frame ${index}`).join('\n')}
     const run = spawnSync(
       process.execPath,
       [SCRIPT, xml, '--title', 'API (Node 22)', '--out', out],
-      {encoding: 'utf8', env: {...process.env, GITHUB_STEP_SUMMARY: summary}},
+      { encoding: 'utf8', env: { ...process.env, GITHUB_STEP_SUMMARY: summary } },
     );
 
     assert.equal(run.status, 0, run.stderr);
@@ -155,8 +161,14 @@ ${Array.from({length: 400}, (_, index) => `frame ${index}`).join('\n')}
   });
 
   it('does not fail the job when the report file is missing', () => {
-    const run = spawnSync(process.execPath, [SCRIPT, join(dir, 'not-produced.xml')], {encoding: 'utf8'});
-    assert.equal(run.status, 0, 'a missing report must not turn a red run into a different failure');
+    const run = spawnSync(process.execPath, [SCRIPT, join(dir, 'not-produced.xml')], {
+      encoding: 'utf8',
+    });
+    assert.equal(
+      run.status,
+      0,
+      'a missing report must not turn a red run into a different failure',
+    );
     assert.match(run.stdout, /no report was written/);
     assert.match(run.stdout, /No test results were produced/);
   });

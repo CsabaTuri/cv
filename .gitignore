@@ -1,8 +1,8 @@
-# Local Netlify folder
-.netlify
-
 chat-backend/node_modules
 .env
-
-# CI tesztek jelentese
 test-results/
+node_modules
+playwright-report
+playwright-report/
+blob-report/
+.eslintcache

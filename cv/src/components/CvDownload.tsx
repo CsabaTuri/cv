@@ -1,7 +1,7 @@
 'use client';
 
-import {useText} from './ContentProvider';
-import {Download} from './icons';
+import { useText } from './ContentProvider';
+import { Download } from './icons';
 
 export default function CvDownload() {
   const label = useText('cv.label');

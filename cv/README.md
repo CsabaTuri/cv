@@ -54,6 +54,18 @@ http://localhost:8081 — login with `MYSQL_USER` / `MYSQL_PASSWORD` from `.env`
 npm run build   # outputs ./out
 ```
 
+## Lint and format
+
+The tooling is installed in the repository root, one level up: `eslint.config.mjs`
+there covers this site together with the services, the tests and the CI scripts.
+
+```bash
+npm run lint        # from cv/, uses the config in the root
+npm --prefix .. run format      # Prettier over the repository
+```
+
+Both run in CI on every push (see the `lint` job in the root README).
+
 ## Project structure
 
 ```

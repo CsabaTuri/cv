@@ -15,12 +15,7 @@
 export type PushAudience = 'admin' | 'visitor';
 
 export type PushError =
-  | 'unsupported'
-  | 'blocked'
-  | 'denied'
-  | 'unavailable'
-  | 'subscribe-failed'
-  | 'server-failed';
+  'unsupported' | 'blocked' | 'denied' | 'unavailable' | 'subscribe-failed' | 'server-failed';
 
 export interface PushResult {
   ok: boolean;
@@ -68,9 +63,9 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
 
 async function publicKey(): Promise<string | null> {
   try {
-    const response = await fetch(`${API}/public-key`, {cache: 'no-store'});
+    const response = await fetch(`${API}/public-key`, { cache: 'no-store' });
     if (!response.ok) return null;
-    const data = (await response.json()) as {key?: string | null};
+    const data = (await response.json()) as { key?: string | null };
     return data.key ?? null;
   } catch {
     return null;
@@ -80,34 +75,34 @@ async function publicKey(): Promise<string | null> {
 function subscriptionPayload(subscription: PushSubscription) {
   const json = subscription.toJSON() as {
     endpoint?: string;
-    keys?: {p256dh?: string; auth?: string};
+    keys?: { p256dh?: string; auth?: string };
   };
 
   if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) return null;
 
-  return {endpoint: json.endpoint, keys: {p256dh: json.keys.p256dh, auth: json.keys.auth}};
+  return { endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } };
 }
 
 // Must be called from a user gesture: the browser only asks for the
 // notification permission in response to a click.
 export async function enablePush(
   audience: PushAudience,
-  options: {sessionId?: string; token?: string; userAgent?: string}
+  options: { sessionId?: string; token?: string; userAgent?: string },
 ): Promise<PushResult> {
-  if (!pushSupported()) return {ok: false, reason: 'unsupported'};
-  if (Notification.permission === 'denied') return {ok: false, reason: 'blocked'};
+  if (!pushSupported()) return { ok: false, reason: 'unsupported' };
+  if (Notification.permission === 'denied') return { ok: false, reason: 'blocked' };
 
   if (Notification.permission !== 'granted') {
     const permission = await Notification.requestPermission();
-    if (permission !== 'granted') return {ok: false, reason: 'denied'};
+    if (permission !== 'granted') return { ok: false, reason: 'denied' };
   }
 
   const key = await publicKey();
-  if (!key) return {ok: false, reason: 'unavailable'};
+  if (!key) return { ok: false, reason: 'unavailable' };
 
   const reg =
     (await registration()) ?? (await navigator.serviceWorker.register('/sw.js').catch(() => null));
-  if (!reg) return {ok: false, reason: 'subscribe-failed'};
+  if (!reg) return { ok: false, reason: 'subscribe-failed' };
 
   try {
     await navigator.serviceWorker.ready;
@@ -123,18 +118,18 @@ export async function enablePush(
         applicationServerKey: urlBase64ToUint8Array(key) as BufferSource,
       });
     } catch {
-      return {ok: false, reason: 'subscribe-failed'};
+      return { ok: false, reason: 'subscribe-failed' };
     }
   }
 
   const payload = subscriptionPayload(subscription);
-  if (!payload) return {ok: false, reason: 'subscribe-failed'};
+  if (!payload) return { ok: false, reason: 'subscribe-failed' };
 
   const response = await fetch(`${API}/subscriptions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(options.token ? {Authorization: `Bearer ${options.token}`} : {}),
+      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
     },
     body: JSON.stringify({
       audience,
@@ -144,27 +139,27 @@ export async function enablePush(
     }),
   }).catch(() => null);
 
-  if (!response?.ok) return {ok: false, reason: 'server-failed'};
+  if (!response?.ok) return { ok: false, reason: 'server-failed' };
 
-  return {ok: true};
+  return { ok: true };
 }
 
 export async function disablePush(
   audience: PushAudience,
-  options: {sessionId?: string; token?: string}
+  options: { sessionId?: string; token?: string },
 ): Promise<PushResult> {
   const subscription = await currentSubscription();
   const endpoint = subscription?.endpoint;
 
   if (subscription) await subscription.unsubscribe().catch(() => undefined);
 
-  if (!endpoint) return {ok: true};
+  if (!endpoint) return { ok: true };
 
   const response = await fetch(`${API}/subscriptions`, {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',
-      ...(options.token ? {Authorization: `Bearer ${options.token}`} : {}),
+      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
     },
     body: JSON.stringify({
       audience,
@@ -173,20 +168,23 @@ export async function disablePush(
     }),
   }).catch(() => null);
 
-  if (!response?.ok) return {ok: false, reason: 'server-failed'};
-  return {ok: true};
+  if (!response?.ok) return { ok: false, reason: 'server-failed' };
+  return { ok: true };
 }
 
 export async function sendTestPush(
-  token: string
-): Promise<{ok: boolean; sent?: number; failed?: number}> {
+  token: string,
+): Promise<{ ok: boolean; sent?: number; failed?: number }> {
   const response = await fetch('/api/admin/push/test', {
     method: 'POST',
-    headers: {Authorization: `Bearer ${token}`},
+    headers: { Authorization: `Bearer ${token}` },
   }).catch(() => null);
 
-  if (!response?.ok) return {ok: false};
+  if (!response?.ok) return { ok: false };
 
-  const data = (await response.json().catch(() => null)) as {sent?: number; failed?: number} | null;
-  return {ok: true, sent: data?.sent ?? 0, failed: data?.failed ?? 0};
+  const data = (await response.json().catch(() => null)) as {
+    sent?: number;
+    failed?: number;
+  } | null;
+  return { ok: true, sent: data?.sent ?? 0, failed: data?.failed ?? 0 };
 }

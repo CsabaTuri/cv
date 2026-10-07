@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback, useEffect, useRef, useState} from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type BuildState = 'idle' | 'running' | 'success' | 'failed';
 
@@ -18,8 +18,7 @@ interface BuildStatus {
 
 type Availability = 'checking' | 'ok' | 'disabled' | 'unreachable';
 
-const ENABLE_COMMAND =
-  'docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d';
+const ENABLE_COMMAND = 'docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d';
 
 function formatDuration(ms: number | null) {
   if (ms === null) return '';
@@ -62,7 +61,7 @@ export default function DeployPanel({
 
     try {
       const response = await fetch('/api/deploy/status', {
-        headers: {Authorization: `Bearer ${token}`},
+        headers: { Authorization: `Bearer ${token}` },
         cache: 'no-store',
       });
 
@@ -130,7 +129,7 @@ export default function DeployPanel({
     try {
       const response = await fetch('/api/deploy/run', {
         method: 'POST',
-        headers: {Authorization: `Bearer ${token}`},
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (response.status === 401) {
@@ -156,7 +155,9 @@ export default function DeployPanel({
   }
 
   const elapsed =
-    running && status?.startedAt ? now - Date.parse(status.startedAt) : status?.durationMs ?? null;
+    running && status?.startedAt
+      ? now - Date.parse(status.startedAt)
+      : (status?.durationMs ?? null);
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-6">
@@ -167,13 +168,12 @@ export default function DeployPanel({
           <code className="rounded bg-gray-100 px-1">
             {status?.services.join(', ') || 'cv, chat-backend'}
           </code>{' '}
-          image-eket a szerveren, majd újraindítja őket. A folyamat a konténerben fut, az
-          oldal közben néhány másodpercre elérhetetlen lehet.
+          image-eket a szerveren, majd újraindítja őket. A folyamat a konténerben fut, az oldal
+          közben néhány másodpercre elérhetetlen lehet.
         </p>
         <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
           A szövegek szerkesztése az <strong>Szövegek</strong> fülön nem igényel buildet — azok
-          azonnal az adatbázisból jönnek. Erre a gombra csak akkor van szükség, ha a kód
-          változott.
+          azonnal az adatbázisból jönnek. Erre a gombra csak akkor van szükség, ha a kód változott.
         </p>
 
         {availability === 'checking' && (
@@ -238,9 +238,11 @@ export default function DeployPanel({
                 <span className="text-gray-500">{formatDuration(elapsed)}</span>
               )}
 
-              {status.state !== 'idle' && status.state !== 'running' && status.exitCode !== null && (
-                <span className="text-gray-500">kilépési kód: {status.exitCode}</span>
-              )}
+              {status.state !== 'idle' &&
+                status.state !== 'running' &&
+                status.exitCode !== null && (
+                  <span className="text-gray-500">kilépési kód: {status.exitCode}</span>
+                )}
 
               {status.finishedAt && (
                 <span className="text-gray-500">

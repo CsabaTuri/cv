@@ -26,14 +26,14 @@ export const CONTENT_FIELDS = [
   },
 
   // --- general ----------------------------------------------------------
-  {key: 'site.name', group: 'Általános', label: 'Név (logó, lábléc)', value: 'Túri Csaba'},
-  {key: 'site.initials', group: 'Általános', label: 'Logó monogram', value: 'TC'},
+  { key: 'site.name', group: 'Általános', label: 'Név (logó, lábléc)', value: 'Túri Csaba' },
+  { key: 'site.initials', group: 'Általános', label: 'Logó monogram', value: 'TC' },
 
   // --- menu -------------------------------------------------------------
-  {key: 'nav.about', group: 'Menü', label: 'Rólam', value: 'Rólam'},
-  {key: 'nav.skills', group: 'Menü', label: 'Kompetenciák', value: 'Kompetenciák'},
-  {key: 'nav.experience', group: 'Menü', label: 'Tapasztalat', value: 'Tapasztalat'},
-  {key: 'nav.contact', group: 'Menü', label: 'Kapcsolat', value: 'Kapcsolat'},
+  { key: 'nav.about', group: 'Menü', label: 'Rólam', value: 'Rólam' },
+  { key: 'nav.skills', group: 'Menü', label: 'Kompetenciák', value: 'Kompetenciák' },
+  { key: 'nav.experience', group: 'Menü', label: 'Tapasztalat', value: 'Tapasztalat' },
+  { key: 'nav.contact', group: 'Menü', label: 'Kapcsolat', value: 'Kapcsolat' },
   {
     key: 'a11y.menu',
     group: 'Menü',
@@ -48,7 +48,7 @@ export const CONTENT_FIELDS = [
   },
 
   // --- hero -------------------------------------------------------------
-  {key: 'hero.name', group: 'Főcím', label: 'Név / főcím', value: 'Túri Csaba vagyok'},
+  { key: 'hero.name', group: 'Főcím', label: 'Név / főcím', value: 'Túri Csaba vagyok' },
   {
     key: 'hero.roles',
     group: 'Főcím',
@@ -68,13 +68,18 @@ export const CONTENT_FIELDS = [
     value:
       'Szoftverminőség, automatizálás és skálázható infrastruktúra a fejlesztéstől az üzemeltetésig.',
   },
-  {key: 'hero.ctaPrimary', group: 'Főcím', label: 'Elsődleges gomb', value: 'Kapcsolatfelvétel'},
-  {key: 'hero.ctaSecondary', group: 'Főcím', label: 'Másodlagos gomb', value: 'Kompetenciáim'},
-  {key: 'hero.scroll', group: 'Főcím', label: 'Lejjebb görgetés felirat', value: 'Görgess lejjebb'},
+  { key: 'hero.ctaPrimary', group: 'Főcím', label: 'Elsődleges gomb', value: 'Kapcsolatfelvétel' },
+  { key: 'hero.ctaSecondary', group: 'Főcím', label: 'Másodlagos gomb', value: 'Kompetenciáim' },
+  {
+    key: 'hero.scroll',
+    group: 'Főcím',
+    label: 'Lejjebb görgetés felirat',
+    value: 'Görgess lejjebb',
+  },
 
   // --- about ------------------------------------------------------------
-  {key: 'about.subtitle', group: 'Rólam', label: 'Felső cím', value: 'Szakmai összefoglaló'},
-  {key: 'about.title', group: 'Rólam', label: 'Cím', value: 'Rólam'},
+  { key: 'about.subtitle', group: 'Rólam', label: 'Felső cím', value: 'Szakmai összefoglaló' },
+  { key: 'about.title', group: 'Rólam', label: 'Cím', value: 'Rólam' },
   {
     key: 'about.p1',
     group: 'Rólam',
@@ -99,20 +104,70 @@ export const CONTENT_FIELDS = [
     label: 'Felső cím',
     value: 'Technológiák és eszközök, amelyekkel dolgozom',
   },
-  {key: 'skills.title', group: 'Kompetenciák', label: 'Cím', value: 'Kiemelt Kompetenciák'},
-  {key: 'skills.testing', group: 'Kompetenciák', label: 'Kategória: QA', value: 'Tesztautomatizálás & QA'},
-  {key: 'skills.containers', group: 'Kompetenciák', label: 'Kategória: Konténer', value: 'Konténerizáció & DevOps'},
-  {key: 'skills.virtualization', group: 'Kompetenciák', label: 'Kategória: Virtualizáció', value: 'Virtualizáció'},
-  {key: 'skills.ai', group: 'Kompetenciák', label: 'Kategória: AI', value: 'AI & Workflow automatizálás'},
-  {key: 'skills.os', group: 'Kompetenciák', label: 'Kategória: OS', value: 'Operációs Rendszerek'},
-  {key: 'skills.programming', group: 'Kompetenciák', label: 'Kategória: Programozás', value: 'Programozás & Scripting'},
-  {key: 'skills.databases', group: 'Kompetenciák', label: 'Kategória: Adatbázisok', value: 'Adatbázisok'},
-  {key: 'skills.infrastructure', group: 'Kompetenciák', label: 'Kategória: Infrastruktúra', value: 'Infrastruktúra & Biztonság'},
-  {key: 'skills.tools', group: 'Kompetenciák', label: 'Kategória: Eszközök', value: 'Eszközök & Rendszerek'},
+  { key: 'skills.title', group: 'Kompetenciák', label: 'Cím', value: 'Kiemelt Kompetenciák' },
+  {
+    key: 'skills.testing',
+    group: 'Kompetenciák',
+    label: 'Kategória: QA',
+    value: 'Tesztautomatizálás & QA',
+  },
+  {
+    key: 'skills.containers',
+    group: 'Kompetenciák',
+    label: 'Kategória: Konténer',
+    value: 'Konténerizáció & DevOps',
+  },
+  {
+    key: 'skills.virtualization',
+    group: 'Kompetenciák',
+    label: 'Kategória: Virtualizáció',
+    value: 'Virtualizáció',
+  },
+  {
+    key: 'skills.ai',
+    group: 'Kompetenciák',
+    label: 'Kategória: AI',
+    value: 'AI & Workflow automatizálás',
+  },
+  {
+    key: 'skills.os',
+    group: 'Kompetenciák',
+    label: 'Kategória: OS',
+    value: 'Operációs Rendszerek',
+  },
+  {
+    key: 'skills.programming',
+    group: 'Kompetenciák',
+    label: 'Kategória: Programozás',
+    value: 'Programozás & Scripting',
+  },
+  {
+    key: 'skills.databases',
+    group: 'Kompetenciák',
+    label: 'Kategória: Adatbázisok',
+    value: 'Adatbázisok',
+  },
+  {
+    key: 'skills.infrastructure',
+    group: 'Kompetenciák',
+    label: 'Kategória: Infrastruktúra',
+    value: 'Infrastruktúra & Biztonság',
+  },
+  {
+    key: 'skills.tools',
+    group: 'Kompetenciák',
+    label: 'Kategória: Eszközök',
+    value: 'Eszközök & Rendszerek',
+  },
 
   // --- experience -------------------------------------------------------
-  {key: 'experience.subtitle', group: 'Tapasztalat', label: 'Felső cím', value: 'Amin dolgoztam'},
-  {key: 'experience.title', group: 'Tapasztalat', label: 'Cím', value: 'Szakmai Tapasztalat & Projektek'},
+  { key: 'experience.subtitle', group: 'Tapasztalat', label: 'Felső cím', value: 'Amin dolgoztam' },
+  {
+    key: 'experience.title',
+    group: 'Tapasztalat',
+    label: 'Cím',
+    value: 'Szakmai Tapasztalat & Projektek',
+  },
   {
     key: 'experience.items',
     group: 'Tapasztalat',
@@ -170,38 +225,63 @@ export const CONTENT_FIELDS = [
     label: 'Felső cím',
     value: 'Építsünk együtt stabil és skálázható rendszert',
   },
-  {key: 'contact.title', group: 'Kapcsolat', label: 'Cím', value: 'Kapcsolatfelvétel'},
-  {key: 'contact.emailValue', group: 'Kapcsolat', label: 'E-mail cím', value: 'contact@turicsaba.hu'},
+  { key: 'contact.title', group: 'Kapcsolat', label: 'Cím', value: 'Kapcsolatfelvétel' },
+  {
+    key: 'contact.emailValue',
+    group: 'Kapcsolat',
+    label: 'E-mail cím',
+    value: 'contact@turicsaba.hu',
+  },
 
   // --- CV ---------------------------------------------------------------
-  {key: 'cv.label', group: 'CV', label: 'Gomb felirat', value: 'CV letöltése'},
+  { key: 'cv.label', group: 'CV', label: 'Gomb felirat', value: 'CV letöltése' },
 
   // --- footer -----------------------------------------------------------
-  {key: 'footer.rights', group: 'Lábléc', label: 'Jogok szövege', value: 'Minden jog fenntartva.'},
+  {
+    key: 'footer.rights',
+    group: 'Lábléc',
+    label: 'Jogok szövege',
+    value: 'Minden jog fenntartva.',
+  },
 
   // --- chat widget ------------------------------------------------------
-  {key: 'chat.title', group: 'Chat', label: 'Ablak címe', value: 'Beszélgetés'},
+  { key: 'chat.title', group: 'Chat', label: 'Ablak címe', value: 'Beszélgetés' },
   {
     key: 'chat.subtitle',
     group: 'Chat',
     label: 'Ablak alcíme',
     value: 'Írj üzenetet, a válasz itt jelenik meg.',
   },
-  {key: 'chat.greeting', group: 'Chat', label: 'Köszöntés', value: 'Szia! Miben segíthetek?'},
-  {key: 'chat.placeholder', group: 'Chat', label: 'Bemenet helykitöltő', value: 'Írd be az üzeneted…'},
-  {key: 'chat.send', group: 'Chat', label: 'Küldés gomb', value: 'Küldés'},
-  {key: 'chat.waiting', group: 'Chat', label: 'Várakozás szövege', value: 'Válaszra várok…'},
+  { key: 'chat.greeting', group: 'Chat', label: 'Köszöntés', value: 'Szia! Miben segíthetek?' },
+  {
+    key: 'chat.placeholder',
+    group: 'Chat',
+    label: 'Bemenet helykitöltő',
+    value: 'Írd be az üzeneted…',
+  },
+  { key: 'chat.send', group: 'Chat', label: 'Küldés gomb', value: 'Küldés' },
+  { key: 'chat.waiting', group: 'Chat', label: 'Várakozás szövege', value: 'Válaszra várok…' },
   {
     key: 'chat.error',
     group: 'Chat',
     label: 'Hibaüzenet',
     value: 'Nem sikerült elküldeni az üzenetet. Próbáld újra később.',
   },
-  {key: 'chat.openLabel', group: 'Chat', label: 'Megnyitás (képernyőolvasó)', value: 'Chat megnyitása'},
-  {key: 'chat.closeLabel', group: 'Chat', label: 'Bezárás (képernyőolvasó)', value: 'Chat bezárása'},
+  {
+    key: 'chat.openLabel',
+    group: 'Chat',
+    label: 'Megnyitás (képernyőolvasó)',
+    value: 'Chat megnyitása',
+  },
+  {
+    key: 'chat.closeLabel',
+    group: 'Chat',
+    label: 'Bezárás (képernyőolvasó)',
+    value: 'Chat bezárása',
+  },
 
   // --- 404 --------------------------------------------------------------
-  {key: 'notFound.title', group: '404 oldal', label: 'Cím', value: 'Az oldal nem található'},
+  { key: 'notFound.title', group: '404 oldal', label: 'Cím', value: 'Az oldal nem található' },
   {
     key: 'notFound.description',
     group: '404 oldal',
@@ -209,7 +289,12 @@ export const CONTENT_FIELDS = [
     multiline: true,
     value: 'A keresett oldal nem létezik, vagy elköltöztették.',
   },
-  {key: 'notFound.home', group: '404 oldal', label: 'Vissza a főoldalra gomb', value: 'Vissza a főoldalra'},
+  {
+    key: 'notFound.home',
+    group: '404 oldal',
+    label: 'Vissza a főoldalra gomb',
+    value: 'Vissza a főoldalra',
+  },
 
   // --- notifications ----------------------------------------------------
   {
@@ -286,7 +371,7 @@ export const CONTENT_FIELDS = [
   },
 
   // --- installable app (PWA) --------------------------------------------
-  {key: 'pwa.install', group: 'Alkalmazás', label: 'Telepítés gomb', value: 'Telepítés'},
+  { key: 'pwa.install', group: 'Alkalmazás', label: 'Telepítés gomb', value: 'Telepítés' },
   {
     key: 'pwa.dismiss',
     group: 'Alkalmazás',

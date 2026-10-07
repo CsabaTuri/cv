@@ -1,7 +1,7 @@
 'use client';
 
-import {motion, type Variants} from 'framer-motion';
-import {useJsonList, useText} from './ContentProvider';
+import { motion, type Variants } from 'framer-motion';
+import { useJsonList, useText } from './ContentProvider';
 
 interface ExperienceItem {
   title: string;
@@ -11,12 +11,12 @@ interface ExperienceItem {
 
 const container: Variants = {
   hidden: {},
-  show: {transition: {staggerChildren: 0.12}},
+  show: { transition: { staggerChildren: 0.12 } },
 };
 
 const card: Variants = {
-  hidden: {opacity: 0, y: 24},
-  show: {opacity: 1, y: 0, transition: {duration: 0.5, ease: 'easeOut'}},
+  hidden: { opacity: 0, y: 24 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } },
 };
 
 export default function Experience() {
@@ -31,16 +31,14 @@ export default function Experience() {
           <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">
             {subtitle}
           </p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-            {title}
-          </h2>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h2>
         </div>
 
         <motion.div
           variants={container}
           initial="hidden"
           whileInView="show"
-          viewport={{once: true, margin: '-60px'}}
+          viewport={{ once: true, margin: '-60px' }}
           className="mt-14 grid gap-6 lg:grid-cols-3"
         >
           {items.map((item, index) => (

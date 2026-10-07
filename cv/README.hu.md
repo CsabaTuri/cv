@@ -55,6 +55,19 @@ http://localhost:8081 címen — belépés a `.env`-beli `MYSQL_USER` /
 npm run build   # az eredmény a ./out könyvtárban
 ```
 
+## Lint és formázás
+
+Az eszközök a repository gyökerében vannak, egy szinttel feljebb: az ottani
+`eslint.config.mjs` fogja át ezt az oldalt a szolgáltatásokkal, a tesztekkel és a
+CI scriptekkel együtt.
+
+```bash
+npm run lint        # a cv/ alól, a gyökér konfigurációját használja
+npm --prefix .. run format      # Prettier az egész repository-ra
+```
+
+Mindkettő fut a CI-ban minden pushnál (lásd a `lint` jobot a gyökér README-ben).
+
 ## Projekt szerkezet
 
 ```

@@ -6,11 +6,11 @@
 // wherever Node 20+ and a MySQL are available (CI uses a `mysql:8.4` service
 // container, the same shape as the stack itself).
 
-import {spawn} from 'node:child_process';
-import {generateKeyPairSync, randomBytes, randomUUID} from 'node:crypto';
+import { spawn } from 'node:child_process';
+import { generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto';
 import net from 'node:net';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_DIR = path.resolve(HERE, '..');
@@ -27,19 +27,19 @@ export const DEFAULT_DB = {
 export const DEFAULT_ADMIN_TOKEN = process.env.ADMIN_TOKEN ?? 'ci-admin-token';
 
 export function adminHeaders(token = DEFAULT_ADMIN_TOKEN) {
-  return {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'};
+  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 }
 
 export function jsonHeaders() {
-  return {'Content-Type': 'application/json'};
+  return { 'Content-Type': 'application/json' };
 }
 
 // A VAPID pair in the shape web-push expects, without importing web-push: an
 // uncompressed P-256 point and the private scalar, both base64url.
 export function vapidKeyPair() {
-  const {publicKey, privateKey} = generateKeyPairSync('ec', {namedCurve: 'prime256v1'});
-  const pub = publicKey.export({format: 'jwk'});
-  const priv = privateKey.export({format: 'jwk'});
+  const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const pub = publicKey.export({ format: 'jwk' });
+  const priv = privateKey.export({ format: 'jwk' });
 
   const point = Buffer.concat([
     Buffer.from([4]),
@@ -55,8 +55,8 @@ export function vapidKeyPair() {
 
 // A subscription object shaped exactly like `PushSubscription.toJSON()`.
 export function fakeSubscription(endpoint) {
-  const {publicKey} = generateKeyPairSync('ec', {namedCurve: 'prime256v1'});
-  const jwk = publicKey.export({format: 'jwk'});
+  const { publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const jwk = publicKey.export({ format: 'jwk' });
 
   const point = Buffer.concat([
     Buffer.from([4]),
@@ -78,7 +78,7 @@ export async function freePort() {
     const server = net.createServer();
     server.on('error', reject);
     server.listen(0, '127.0.0.1', () => {
-      const {port} = server.address();
+      const { port } = server.address();
       server.close(() => resolve(port));
     });
   });
@@ -106,7 +106,7 @@ async function waitForHealth(port, child, logs) {
 }
 
 // Boots the real entry point (`node server.js`), the way the container does.
-export async function startBackend({env = {}} = {}) {
+export async function startBackend({ env = {} } = {}) {
   const port = await freePort();
   const logs = [];
 

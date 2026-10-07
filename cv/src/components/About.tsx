@@ -1,6 +1,6 @@
 'use client';
 
-import {renderBold, useText} from './ContentProvider';
+import { renderBold, useText } from './ContentProvider';
 import Reveal from './Reveal';
 
 export default function About() {
@@ -16,9 +16,7 @@ export default function About() {
           <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">
             {subtitle}
           </p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-            {title}
-          </h2>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h2>
         </Reveal>
         <Reveal delay={0.1}>
           <div className="mt-8 space-y-4 text-lg leading-relaxed text-gray-600">

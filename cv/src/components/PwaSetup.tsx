@@ -1,11 +1,12 @@
 'use client';
 
-import {useEffect, useState} from 'react';
-import {useText} from './ContentProvider';
+import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useText } from './ContentProvider';
 
 interface InstallPromptEvent extends Event {
   prompt: () => Promise<void>;
-  userChoice: Promise<{outcome: 'accepted' | 'dismissed'}>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
 // Registers the service worker (offline shell + push notifications) and shows
@@ -17,11 +18,11 @@ export default function PwaSetup() {
   const dismissLabel = useText('pwa.dismiss');
   const [prompt, setPrompt] = useState<InstallPromptEvent | null>(null);
   const [dismissed, setDismissed] = useState(false);
-  const [admin, setAdmin] = useState(true);
+  // Knowing the route during render keeps the offer off the admin panel from
+  // the first paint instead of after an effect.
+  const admin = (usePathname() ?? '').startsWith('/admin');
 
   useEffect(() => {
-    setAdmin(window.location.pathname.startsWith('/admin'));
-
     if ('serviceWorker' in navigator && window.isSecureContext) {
       navigator.serviceWorker.register('/sw.js').catch(() => undefined);
     }

@@ -18,19 +18,23 @@ const MAX_FAILURE_CHARS = 1200;
 const MAX_MESSAGE_LINES = 12;
 const MAX_REPORT_CHARS = 60000;
 
+// The ESC byte of the colour codes `node --test` writes around failures.
+// eslint-disable-next-line no-control-regex -- the control character is the point
 const ANSI = /\u001b\[[0-9;]*m/g;
 
 export function decodeEntities(value) {
-  return String(value)
-    // `node --test` escapes the quotes inside attribute values twice
-    // (`"` -> `&quot;` -> `&amp;quot;`), so that pair has to resolve first.
-    .replaceAll('&amp;quot;', '&quot;')
-    .replaceAll('&lt;', '<')
-    .replaceAll('&gt;', '>')
-    .replaceAll('&quot;', '"')
-    .replaceAll('&apos;', "'")
-    .replaceAll('&#39;', "'")
-    .replaceAll('&amp;', '&');
+  return (
+    String(value)
+      // `node --test` escapes the quotes inside attribute values twice
+      // (`"` -> `&quot;` -> `&amp;quot;`), so that pair has to resolve first.
+      .replaceAll('&amp;quot;', '&quot;')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&apos;', "'")
+      .replaceAll('&#39;', "'")
+      .replaceAll('&amp;', '&')
+  );
 }
 
 function attributes(tag) {
@@ -45,7 +49,9 @@ function dedent(text) {
   const lines = text.replace(ANSI, '').replace(/\r\n?/g, '\n').split('\n');
   while (lines.length && !lines[0].trim()) lines.shift();
   while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
-  const indents = lines.filter((line) => line.trim()).map((line) => line.length - line.trimStart().length);
+  const indents = lines
+    .filter((line) => line.trim())
+    .map((line) => line.length - line.trimStart().length);
   const indent = indents.length ? Math.min(...indents) : 0;
   return lines.map((line) => line.slice(indent)).join('\n');
 }
@@ -117,7 +123,10 @@ function seconds(value) {
 }
 
 /** Renders the markdown shown on the run page and in the pull request. */
-export function renderReport(suites, { title = 'Test report', notes = [], failures = MAX_FAILURES } = {}) {
+export function renderReport(
+  suites,
+  { title = 'Test report', notes = [], failures = MAX_FAILURES } = {},
+) {
   const cases = suites.flatMap((suite) => suite.cases);
   const count = (status) => cases.filter((item) => item.status === status).length;
   const passed = count('passed');
@@ -148,8 +157,8 @@ export function renderReport(suites, { title = 'Test report', notes = [], failur
 
   for (const suite of suites) {
     if (!suite.cases.length) continue;
-    const inner = ['passed', 'failed', 'skipped'].map((status) =>
-      suite.cases.filter((item) => item.status === status).length,
+    const inner = ['passed', 'failed', 'skipped'].map(
+      (status) => suite.cases.filter((item) => item.status === status).length,
     );
     lines.push(
       `| ${suite.name} | ${suite.cases.length} | ${inner[0]} | ${inner[1]} | ${inner[2]} | ${seconds(suite.time)} |`,

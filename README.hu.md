@@ -182,6 +182,40 @@ GET    /api/admin/push/subscriptions
 POST   /api/admin/push/test      # teszt értesítés az admin böngészőinek
 ```
 
+## Eszközök
+
+Az eszközök a repository gyökerében laknak; az oldal a saját függőségeit a
+`cv/` alatt tartja.
+
+```bash
+npm ci                        # ESLint, Prettier, Playwright
+npm ci --prefix cv            # az oldal
+npm ci --prefix chat-backend  # az API
+
+npm run lint                  # ESLint: szolgáltatások, tesztek, CI scriptek, oldal
+npm run format                # Prettier; a CI a format:check-et futtatja
+npm test                      # a unit és integrációs készlet
+npm run e2e                   # Playwright a valódi stack ellen
+```
+
+| Parancs | Mit fog át |
+| --- | --- |
+| `npm run lint` | egy flat config ([`eslint.config.mjs`](./eslint.config.mjs)): Node globals a `chat-backend/`, `deployer/`, `tests/` és `.github/scripts/` alatt, plusz TypeScript, React hooks, `jsx-a11y` és a Next szabályok a `cv/src`-re |
+| `npm run format` | Prettier JS/TS/JSX/JSON/CSS fájlokra. A markdown, a compose fájlok, a workflow-k és a `.env*` szándékosan kimaradnak - azokat kézzel tördelve, soronként átnézve írtuk (lásd [`.prettierignore`](./.prettierignore)) |
+| `npm test` | az 54 unit és integrációs teszt a [`tests/`](./tests) alatt |
+| `npm run e2e` | 18 Playwright teszt a valódi export, a valódi API és egy valódi adatbázis ellen |
+
+Az end-to-end futáshoz előbb kell az export; a két szervert aztán a Playwright
+indítja (az API-t a `chat-backend/`-ből, a `cv/out`-ot pedig a
+[`tests/e2e/server.mjs`](./tests/e2e/server.mjs) szolgálja ki, ami az
+`cv/nginx.conf` proxy- és 404-szabályait utánozza):
+
+```bash
+npm --prefix cv run build
+npx playwright install --with-deps chromium   # gépenként egyszer
+DB_PORT=3307 npm run e2e
+```
+
 ## Tesztek és CI
 
 Minden a [`tests/`](./tests) könyvtárban van, és csak Node 20+ meg egy MySQL
@@ -201,11 +235,16 @@ DB_USER=chat DB_PASSWORD=chat ADMIN_TOKEN=ci-admin-token \
 | `tests/content.test.mjs` | a szövegkatalógus: egyedi kulcsok, JSON szerializálás, és hogy a frontend minden kért kulcsa létezik - a megfelelő hookkal |
 | `tests/assets.test.mjs` | a PWA (manifest mezők, ikonok a deklarált méretekkel, a worker handlerei), az nginx szabályok, és a compose invariánsok, amiket ez a stack már elrontott: nincs `latest`, nincs profile a rebuild helperen, a gateway a subnetjén belül, a VAPID kulcsok mindkét szolgáltatáshoz eljutnak, `.env.example` szinkronban |
 
-A [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) három jobot futtat
-minden pull requestnél és a `main`-re való pushnál: az oldal (typecheck +
-statikus export, benne a PWA fájlok), a fenti készlet `mysql:8.4` service ellen
-Node 20-on és 22-n, valamint az image-ek (mindkét overlay, a fail-fast őr `.env`
-nélkül, `docker compose build`, és `nginx -t` a megépített image-ben).
+A [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) öt jobot futtat
+minden pull requestnél és a `main`-re való pushnál:
+
+| Job | Mit csinál |
+| --- | --- |
+| `lint` | ESLint és `prettier --check` az egész repository-ra |
+| `site` | typecheck + statikus export, benne a PWA fájlok |
+| `api` | a fenti készlet `mysql:8.4` service ellen, Node 20-on és 22-n |
+| `e2e` | megépíti az exportot, telepíti a Chromiumot, és lefuttatja a Playwright készletet ugyanazon a `mysql:8.4` service-en |
+| `docker` | mindkét overlay, a fail-fast őr `.env` nélkül, `docker compose build`, és `nginx -t` a megépített image-ben |
 
 ### Az eredmények megjelenítése
 
@@ -221,7 +260,10 @@ sem kell extra eszköz vagy külső action:
   markdown jelentést, 14 napig letölthető a futás oldaláról.
 * **Pull request komment** - pull requestnél ugyanez a markdown megy kommentként,
   és minden pushnál ugyanaz a komment frissül, nem lesz belőle egy sorozat.
-  Forknál a token csak olvasásra jó, ezért az a lépés ott elhasalhat.
+  Minden job a saját kommentjét tartja: mindkettő hordoz egy rejtett markert, így
+  a unit és az end-to-end jelentés nem írja felül egymást
+  ([`.github/scripts/pr-comment.sh`](./.github/scripts/pr-comment.sh)). Forknál a
+  token csak olvasásra jó, ezért az a lépés ott elhasalhat.
 
 Ugyanez a jelentés lokálisan, a fenti parancs után:
 

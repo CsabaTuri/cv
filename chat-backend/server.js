@@ -44,10 +44,10 @@
 //   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT  Web Push (optional)
 //   PORT                                             default 3000
 
-import {randomUUID, timingSafeEqual} from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import express from 'express';
 import mysql from 'mysql2/promise';
-import {CONTENT_FIELDS, storedValue} from './content.js';
+import { CONTENT_FIELDS, storedValue } from './content.js';
 import {
   deleteSubscription,
   listSubscriptions,
@@ -61,7 +61,7 @@ import {
 } from './push.js';
 
 const app = express();
-app.use(express.json({limit: '32kb'}));
+app.use(express.json({ limit: '32kb' }));
 
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN ?? '';
 const MAX_MESSAGE_LENGTH = 4000;
@@ -128,10 +128,10 @@ const SCHEMA = [
 // Seeds the catalogue: existing rows are kept, so admin edits survive restarts.
 async function seedContent() {
   for (const field of CONTENT_FIELDS) {
-    await pool.query(
-      'INSERT IGNORE INTO site_content (\`key\`, value) VALUES (?, ?)',
-      [field.key, storedValue(field)],
-    );
+    await pool.query('INSERT IGNORE INTO site_content (`key`, value) VALUES (?, ?)', [
+      field.key,
+      storedValue(field),
+    ]);
   }
 
   // Drop rows whose field no longer exists in the catalogue.
@@ -152,7 +152,9 @@ async function initDatabase() {
       return;
     } catch (error) {
       if (attempt >= 30) throw error;
-      console.warn(`[chat] database not ready (attempt ${attempt}): ${error.code ?? error.message}`);
+      console.warn(
+        `[chat] database not ready (attempt ${attempt}): ${error.code ?? error.message}`,
+      );
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
   }
@@ -178,9 +180,9 @@ function isUuidLike(value) {
 
 function readMessage(body) {
   const message = typeof body?.message === 'string' ? body.message.trim() : '';
-  if (!message) return {error: 'Missing message'};
-  if (message.length > MAX_MESSAGE_LENGTH) return {error: 'Message too long'};
-  return {message};
+  if (!message) return { error: 'Missing message' };
+  if (message.length > MAX_MESSAGE_LENGTH) return { error: 'Message too long' };
+  return { message };
 }
 
 function readAfterId(query) {
@@ -202,7 +204,7 @@ function isAdmin(req) {
 
 function requireAdmin(req, res, next) {
   if (isAdmin(req)) return next();
-  return res.status(401).json({ok: false, error: 'Unauthorized'});
+  return res.status(401).json({ ok: false, error: 'Unauthorized' });
 }
 
 async function insertMessage(conversationId, role, body) {
@@ -252,7 +254,7 @@ async function pushTexts() {
     };
   } catch (error) {
     console.error('[push] could not read the notification texts:', error.message);
-    return {...PUSH_TEXT_DEFAULTS};
+    return { ...PUSH_TEXT_DEFAULTS };
   }
 }
 
@@ -268,10 +270,11 @@ async function ensureConversation(sessionId, req) {
   const ip = forwarded || req.socket.remoteAddress || null;
   const userAgent = (req.get('user-agent') ?? '').slice(0, 255) || null;
 
-  await pool.query(
-    'INSERT INTO conversations (id, visitor_ip, user_agent) VALUES (?, ?, ?)',
-    [sessionId, ip?.slice(0, 45) ?? null, userAgent],
-  );
+  await pool.query('INSERT INTO conversations (id, visitor_ip, user_agent) VALUES (?, ?, ?)', [
+    sessionId,
+    ip?.slice(0, 45) ?? null,
+    userAgent,
+  ]);
 
   return sessionId;
 }
@@ -279,9 +282,9 @@ async function ensureConversation(sessionId, req) {
 app.get(['/health', '/api/health'], async (_req, res) => {
   try {
     await pool.query('SELECT 1');
-    return res.json({ok: true, database: true});
+    return res.json({ ok: true, database: true });
   } catch {
-    return res.status(503).json({ok: false, database: false});
+    return res.status(503).json({ ok: false, database: false });
   }
 });
 
@@ -296,18 +299,18 @@ app.get('/api/content', async (_req, res) => {
     for (const field of CONTENT_FIELDS) content[field.key] = storedValue(field);
     for (const row of rows) content[row.key] = row.value;
 
-    return res.json({ok: true, content});
+    return res.json({ ok: true, content });
   } catch (dbError) {
     console.error('[chat] failed to read the content:', dbError);
-    return res.status(500).json({ok: false, error: 'Could not read the content'});
+    return res.status(500).json({ ok: false, error: 'Could not read the content' });
   }
 });
 
 // --- Visitor API -----------------------------------------------------------
 
 app.post('/api/chat', async (req, res) => {
-  const {message, error} = readMessage(req.body);
-  if (error) return res.status(400).json({ok: false, error});
+  const { message, error } = readMessage(req.body);
+  if (error) return res.status(400).json({ ok: false, error });
 
   const requested = req.body?.sessionId;
   const sessionId = isUuidLike(requested) ? requested : randomUUID();
@@ -317,21 +320,23 @@ app.post('/api/chat', async (req, res) => {
     const stored = await insertMessage(sessionId, 'visitor', message);
 
     sendInBackground(
-      pushTexts().then((texts) => notifyAdmins(pool, {conversationId: sessionId, message, texts})),
+      pushTexts().then((texts) =>
+        notifyAdmins(pool, { conversationId: sessionId, message, texts }),
+      ),
       'admin notification',
     );
 
-    return res.status(201).json({ok: true, sessionId, message: stored});
+    return res.status(201).json({ ok: true, sessionId, message: stored });
   } catch (dbError) {
     console.error('[chat] failed to store message:', dbError);
-    return res.status(500).json({ok: false, error: 'Could not store message'});
+    return res.status(500).json({ ok: false, error: 'Could not store message' });
   }
 });
 
 app.get('/api/chat/messages', async (req, res) => {
   const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : '';
   if (!isUuidLike(sessionId)) {
-    return res.status(400).json({ok: false, error: 'Missing sessionId'});
+    return res.status(400).json({ ok: false, error: 'Missing sessionId' });
   }
 
   const afterId = readAfterId(req.query);
@@ -349,39 +354,40 @@ app.get('/api/chat/messages', async (req, res) => {
     });
   } catch (dbError) {
     console.error('[chat] failed to read messages:', dbError);
-    return res.status(500).json({ok: false, error: 'Could not read messages'});
+    return res.status(500).json({ ok: false, error: 'Could not read messages' });
   }
 });
 
 // --- Push notifications ----------------------------------------------------
 
 app.get('/api/push/public-key', (_req, res) => {
-  res.json({ok: true, enabled: pushConfigured(), key: vapidPublicKey()});
+  res.json({ ok: true, enabled: pushConfigured(), key: vapidPublicKey() });
 });
 
 // One endpoint for both sides: the audience decides which credential it needs.
 function readAudience(req) {
   const audience = req.body?.audience;
-  if (audience !== 'admin' && audience !== 'visitor') return {error: 'Unknown audience'};
+  if (audience !== 'admin' && audience !== 'visitor') return { error: 'Unknown audience' };
 
   if (audience === 'admin') {
-    if (!isAdmin(req)) return {unauthorized: true};
-    return {audience, conversationId: null};
+    if (!isAdmin(req)) return { unauthorized: true };
+    return { audience, conversationId: null };
   }
 
   const sessionId = req.body?.sessionId;
-  if (!isUuidLike(sessionId)) return {error: 'Missing sessionId'};
-  return {audience, conversationId: sessionId};
+  if (!isUuidLike(sessionId)) return { error: 'Missing sessionId' };
+  return { audience, conversationId: sessionId };
 }
 
 app.post('/api/push/subscriptions', async (req, res) => {
-  const {audience, conversationId, error, unauthorized} = readAudience(req);
-  if (unauthorized) return res.status(401).json({ok: false, error: 'Unauthorized'});
-  if (error) return res.status(400).json({ok: false, error});
-  if (!pushConfigured()) return res.status(503).json({ok: false, error: 'Push is not configured'});
+  const { audience, conversationId, error, unauthorized } = readAudience(req);
+  if (unauthorized) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  if (error) return res.status(400).json({ ok: false, error });
+  if (!pushConfigured())
+    return res.status(503).json({ ok: false, error: 'Push is not configured' });
 
   const subscription = readSubscription(req.body);
-  if (!subscription) return res.status(400).json({ok: false, error: 'Invalid subscription'});
+  if (!subscription) return res.status(400).json({ ok: false, error: 'Invalid subscription' });
 
   try {
     await saveSubscription(pool, {
@@ -390,27 +396,27 @@ app.post('/api/push/subscriptions', async (req, res) => {
       subscription,
       userAgent: req.body?.userAgent ?? req.get('user-agent'),
     });
-    return res.status(201).json({ok: true});
+    return res.status(201).json({ ok: true });
   } catch (dbError) {
     console.error('[push] failed to store the subscription:', dbError);
-    return res.status(500).json({ok: false, error: 'Could not store subscription'});
+    return res.status(500).json({ ok: false, error: 'Could not store subscription' });
   }
 });
 
 app.delete('/api/push/subscriptions', async (req, res) => {
-  const {audience, conversationId, error, unauthorized} = readAudience(req);
-  if (unauthorized) return res.status(401).json({ok: false, error: 'Unauthorized'});
-  if (error) return res.status(400).json({ok: false, error});
+  const { audience, conversationId, error, unauthorized } = readAudience(req);
+  if (unauthorized) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+  if (error) return res.status(400).json({ ok: false, error });
 
   const endpoint = typeof req.body?.endpoint === 'string' ? req.body.endpoint : '';
-  if (!endpoint) return res.status(400).json({ok: false, error: 'Missing endpoint'});
+  if (!endpoint) return res.status(400).json({ ok: false, error: 'Missing endpoint' });
 
   try {
-    const removed = await deleteSubscription(pool, {audience, conversationId, endpoint});
-    return res.json({ok: true, removed});
+    const removed = await deleteSubscription(pool, { audience, conversationId, endpoint });
+    return res.json({ ok: true, removed });
   } catch (dbError) {
     console.error('[push] failed to remove the subscription:', dbError);
-    return res.status(500).json({ok: false, error: 'Could not remove subscription'});
+    return res.status(500).json({ ok: false, error: 'Could not remove subscription' });
   }
 });
 
@@ -460,10 +466,10 @@ app.get('/api/admin/conversations', requireAdmin, async (_req, res) => {
         : null,
     }));
 
-    return res.json({ok: true, conversations});
+    return res.json({ ok: true, conversations });
   } catch (dbError) {
     console.error('[chat] failed to list conversations:', dbError);
-    return res.status(500).json({ok: false, error: 'Could not list conversations'});
+    return res.status(500).json({ ok: false, error: 'Could not list conversations' });
   }
 });
 
@@ -483,41 +489,37 @@ app.get('/api/admin/conversations/:id/messages', requireAdmin, async (req, res) 
     });
   } catch (dbError) {
     console.error('[chat] failed to read conversation:', dbError);
-    return res.status(500).json({ok: false, error: 'Could not read conversation'});
+    return res.status(500).json({ ok: false, error: 'Could not read conversation' });
   }
 });
 
 app.post('/api/admin/conversations/:id/reply', requireAdmin, async (req, res) => {
-  const {message, error} = readMessage(req.body);
-  if (error) return res.status(400).json({ok: false, error});
+  const { message, error } = readMessage(req.body);
+  if (error) return res.status(400).json({ ok: false, error });
 
   try {
-    const [rows] = await pool.query('SELECT id FROM conversations WHERE id = ?', [
-      req.params.id,
-    ]);
-    if (!rows.length) return res.status(404).json({ok: false, error: 'Unknown conversation'});
+    const [rows] = await pool.query('SELECT id FROM conversations WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ ok: false, error: 'Unknown conversation' });
 
     const stored = await insertMessage(req.params.id, 'admin', message);
 
     sendInBackground(
       pushTexts().then((texts) =>
-        notifyVisitor(pool, {conversationId: req.params.id, message, texts}),
+        notifyVisitor(pool, { conversationId: req.params.id, message, texts }),
       ),
       'visitor notification',
     );
 
-    return res.status(201).json({ok: true, message: stored});
+    return res.status(201).json({ ok: true, message: stored });
   } catch (dbError) {
     console.error('[chat] failed to store reply:', dbError);
-    return res.status(500).json({ok: false, error: 'Could not store reply'});
+    return res.status(500).json({ ok: false, error: 'Could not store reply' });
   }
 });
 
 app.get('/api/admin/content', requireAdmin, async (_req, res) => {
   try {
-    const [rows] = await pool.query(
-      'SELECT `key`, value, updated_at FROM site_content',
-    );
+    const [rows] = await pool.query('SELECT `key`, value, updated_at FROM site_content');
     const stored = new Map(rows.map((row) => [row.key, row]));
 
     const fields = CONTENT_FIELDS.map((field) => {
@@ -533,17 +535,17 @@ app.get('/api/admin/content', requireAdmin, async (_req, res) => {
       };
     });
 
-    return res.json({ok: true, fields});
+    return res.json({ ok: true, fields });
   } catch (dbError) {
     console.error('[chat] failed to read the content fields:', dbError);
-    return res.status(500).json({ok: false, error: 'Could not read the content'});
+    return res.status(500).json({ ok: false, error: 'Could not read the content' });
   }
 });
 
 app.put('/api/admin/content', requireAdmin, async (req, res) => {
   const values = req.body?.values;
   if (!values || typeof values !== 'object' || Array.isArray(values)) {
-    return res.status(400).json({ok: false, error: 'Missing values'});
+    return res.status(400).json({ ok: false, error: 'Missing values' });
   }
 
   const known = new Map(CONTENT_FIELDS.map((field) => [field.key, field]));
@@ -554,16 +556,14 @@ app.put('/api/admin/content', requireAdmin, async (req, res) => {
     if (!field || typeof raw !== 'string') continue;
 
     if (raw.length > 20000) {
-      return res.status(413).json({ok: false, error: `Value too long: ${key}`});
+      return res.status(413).json({ ok: false, error: `Value too long: ${key}` });
     }
 
     if (field.json) {
       try {
         JSON.parse(raw);
       } catch {
-        return res
-          .status(400)
-          .json({ok: false, error: `Invalid JSON in field: ${key}`});
+        return res.status(400).json({ ok: false, error: `Invalid JSON in field: ${key}` });
       }
     }
 
@@ -571,7 +571,7 @@ app.put('/api/admin/content', requireAdmin, async (req, res) => {
   }
 
   if (!updates.length) {
-    return res.status(400).json({ok: false, error: 'No valid fields'});
+    return res.status(400).json({ ok: false, error: 'No valid fields' });
   }
 
   try {
@@ -582,10 +582,10 @@ app.put('/api/admin/content', requireAdmin, async (req, res) => {
       );
     }
 
-    return res.json({ok: true, saved: updates.length});
+    return res.json({ ok: true, saved: updates.length });
   } catch (dbError) {
     console.error('[chat] failed to save the content:', dbError);
-    return res.status(500).json({ok: false, error: 'Could not save the content'});
+    return res.status(500).json({ ok: false, error: 'Could not save the content' });
   }
 });
 
@@ -603,19 +603,20 @@ app.get('/api/admin/push/subscriptions', requireAdmin, async (_req, res) => {
     });
   } catch (dbError) {
     console.error('[push] failed to list the subscriptions:', dbError);
-    return res.status(500).json({ok: false, error: 'Could not list subscriptions'});
+    return res.status(500).json({ ok: false, error: 'Could not list subscriptions' });
   }
 });
 
 app.post('/api/admin/push/test', requireAdmin, async (_req, res) => {
-  if (!pushConfigured()) return res.status(503).json({ok: false, error: 'Push is not configured'});
+  if (!pushConfigured())
+    return res.status(503).json({ ok: false, error: 'Push is not configured' });
 
   try {
-    const result = await notifyAdminsTest(pool, {texts: await pushTexts()});
-    return res.json({ok: true, ...result});
+    const result = await notifyAdminsTest(pool, { texts: await pushTexts() });
+    return res.json({ ok: true, ...result });
   } catch (error) {
     console.error('[push] test notification failed:', error);
-    return res.status(500).json({ok: false, error: 'Could not send the test notification'});
+    return res.status(500).json({ ok: false, error: 'Could not send the test notification' });
   }
 });
 

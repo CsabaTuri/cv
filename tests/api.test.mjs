@@ -11,8 +11,8 @@
 //   DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD, ADMIN_TOKEN
 
 import assert from 'node:assert/strict';
-import {after, before, describe, it} from 'node:test';
-import {CONTENT_FIELDS} from '../chat-backend/content.js';
+import { after, before, describe, it } from 'node:test';
+import { CONTENT_FIELDS } from '../chat-backend/content.js';
 import {
   DEFAULT_ADMIN_TOKEN,
   adminHeaders,
@@ -63,7 +63,7 @@ describe('visitor chat', () => {
     const response = await fetch(`${backend.url}/api/chat`, {
       method: 'POST',
       headers: jsonHeaders(),
-      body: JSON.stringify({sessionId: session, message: 'Első üzenet'}),
+      body: JSON.stringify({ sessionId: session, message: 'Első üzenet' }),
     });
     const body = await readJson(response);
 
@@ -79,7 +79,7 @@ describe('visitor chat', () => {
     const response = await fetch(`${backend.url}/api/chat`, {
       method: 'POST',
       headers: jsonHeaders(),
-      body: JSON.stringify({message: 'Session nélkül'}),
+      body: JSON.stringify({ message: 'Session nélkül' }),
     });
     const body = await readJson(response);
 
@@ -90,7 +90,7 @@ describe('visitor chat', () => {
 
   it('returns only the messages after the cursor', async () => {
     const first = await readJson(
-      await fetch(`${backend.url}/api/chat/messages?sessionId=${session}&afterId=0`)
+      await fetch(`${backend.url}/api/chat/messages?sessionId=${session}&afterId=0`),
     );
     assert.equal(first.messages.length, 1);
     cursor = first.cursor;
@@ -98,11 +98,11 @@ describe('visitor chat', () => {
     await fetch(`${backend.url}/api/chat`, {
       method: 'POST',
       headers: jsonHeaders(),
-      body: JSON.stringify({sessionId: session, message: 'Második üzenet'}),
+      body: JSON.stringify({ sessionId: session, message: 'Második üzenet' }),
     });
 
     const second = await readJson(
-      await fetch(`${backend.url}/api/chat/messages?sessionId=${session}&afterId=${cursor}`)
+      await fetch(`${backend.url}/api/chat/messages?sessionId=${session}&afterId=${cursor}`),
     );
     assert.equal(second.messages.length, 1);
     assert.equal(second.messages[0].body, 'Második üzenet');
@@ -113,14 +113,14 @@ describe('visitor chat', () => {
     const empty = await fetch(`${backend.url}/api/chat`, {
       method: 'POST',
       headers: jsonHeaders(),
-      body: JSON.stringify({sessionId: session, message: '   '}),
+      body: JSON.stringify({ sessionId: session, message: '   ' }),
     });
     assert.equal(empty.status, 400);
 
     const long = await fetch(`${backend.url}/api/chat`, {
       method: 'POST',
       headers: jsonHeaders(),
-      body: JSON.stringify({sessionId: session, message: 'x'.repeat(4001)}),
+      body: JSON.stringify({ sessionId: session, message: 'x'.repeat(4001) }),
     });
     assert.equal(long.status, 400);
   });
@@ -140,13 +140,13 @@ describe('admin API', () => {
           headers: adminHeaders('wrong-token'),
         })
       ).status,
-      401
+      401,
     );
   });
 
   it('lists the conversation with its unread count', async () => {
     const body = await readJson(
-      await fetch(`${backend.url}/api/admin/conversations`, {headers: adminHeaders()})
+      await fetch(`${backend.url}/api/admin/conversations`, { headers: adminHeaders() }),
     );
 
     const conversation = body.conversations.find((item) => item.id === session);
@@ -161,7 +161,7 @@ describe('admin API', () => {
     const response = await fetch(`${backend.url}/api/admin/conversations/${session}/reply`, {
       method: 'POST',
       headers: adminHeaders(),
-      body: JSON.stringify({message: 'Válasz a tesztből'}),
+      body: JSON.stringify({ message: 'Válasz a tesztből' }),
     });
     const body = await readJson(response);
 
@@ -169,7 +169,7 @@ describe('admin API', () => {
     assert.equal(body.message.role, 'admin');
 
     const list = await readJson(
-      await fetch(`${backend.url}/api/admin/conversations`, {headers: adminHeaders()})
+      await fetch(`${backend.url}/api/admin/conversations`, { headers: adminHeaders() }),
     );
     const conversation = list.conversations.find((item) => item.id === session);
     assert.equal(conversation.unread, 0);
@@ -177,20 +177,17 @@ describe('admin API', () => {
     const thread = await readJson(
       await fetch(`${backend.url}/api/admin/conversations/${session}/messages`, {
         headers: adminHeaders(),
-      })
+      }),
     );
     assert.equal(thread.messages.at(-1).body, 'Válasz a tesztből');
   });
 
   it('answers 404 for an unknown conversation', async () => {
-    const response = await fetch(
-      `${backend.url}/api/admin/conversations/${uuid()}/reply`,
-      {
-        method: 'POST',
-        headers: adminHeaders(),
-        body: JSON.stringify({message: 'Sehova'}),
-      }
-    );
+    const response = await fetch(`${backend.url}/api/admin/conversations/${uuid()}/reply`, {
+      method: 'POST',
+      headers: adminHeaders(),
+      body: JSON.stringify({ message: 'Sehova' }),
+    });
     assert.equal(response.status, 404);
   });
 });
@@ -209,8 +206,8 @@ describe('site copy', () => {
       await fetch(`${backend.url}/api/admin/content`, {
         method: 'PUT',
         headers: adminHeaders(),
-        body: JSON.stringify({values: {[textField.key]: 'Teszt érték'}}),
-      })
+        body: JSON.stringify({ values: { [textField.key]: 'Teszt érték' } }),
+      }),
     );
     assert.equal(saved.saved, 1);
 
@@ -220,14 +217,14 @@ describe('site copy', () => {
     const unknown = await fetch(`${backend.url}/api/admin/content`, {
       method: 'PUT',
       headers: adminHeaders(),
-      body: JSON.stringify({values: {'nincs.ilyen': 'x'}}),
+      body: JSON.stringify({ values: { 'nincs.ilyen': 'x' } }),
     });
     assert.equal(unknown.status, 400);
 
     const tooLong = await fetch(`${backend.url}/api/admin/content`, {
       method: 'PUT',
       headers: adminHeaders(),
-      body: JSON.stringify({values: {[textField.key]: 'x'.repeat(20001)}}),
+      body: JSON.stringify({ values: { [textField.key]: 'x'.repeat(20001) } }),
     });
     assert.equal(tooLong.status, 413);
   });
@@ -238,14 +235,14 @@ describe('site copy', () => {
     const broken = await fetch(`${backend.url}/api/admin/content`, {
       method: 'PUT',
       headers: adminHeaders(),
-      body: JSON.stringify({values: {[jsonField.key]: '{not json'}}),
+      body: JSON.stringify({ values: { [jsonField.key]: '{not json' } }),
     });
     assert.equal(broken.status, 400);
 
     const valid = await fetch(`${backend.url}/api/admin/content`, {
       method: 'PUT',
       headers: adminHeaders(),
-      body: JSON.stringify({values: {[jsonField.key]: '[]'}}),
+      body: JSON.stringify({ values: { [jsonField.key]: '[]' } }),
     });
     assert.equal(valid.status, 200);
   });
@@ -265,8 +262,8 @@ describe('push subscriptions', () => {
 
   it('rejects invalid subscription requests', async () => {
     const cases = [
-      {audience: 'nonsense', subscription: fakeSubscription(adminEndpoint), status: 400},
-      {audience: 'visitor', subscription: fakeSubscription(visitorEndpoint), status: 400},
+      { audience: 'nonsense', subscription: fakeSubscription(adminEndpoint), status: 400 },
+      { audience: 'visitor', subscription: fakeSubscription(visitorEndpoint), status: 400 },
     ];
 
     for (const item of cases) {
@@ -284,7 +281,7 @@ describe('push subscriptions', () => {
       body: JSON.stringify({
         audience: 'visitor',
         sessionId: session,
-        subscription: {endpoint: visitorEndpoint, keys: {p256dh: '!!!', auth: '!!'}},
+        subscription: { endpoint: visitorEndpoint, keys: { p256dh: '!!!', auth: '!!' } },
       }),
     });
     assert.equal(badKeys.status, 400);
@@ -303,7 +300,7 @@ describe('push subscriptions', () => {
     const noToken = await fetch(`${backend.url}/api/push/subscriptions`, {
       method: 'POST',
       headers: jsonHeaders(),
-      body: JSON.stringify({audience: 'admin', subscription: fakeSubscription(adminEndpoint)}),
+      body: JSON.stringify({ audience: 'admin', subscription: fakeSubscription(adminEndpoint) }),
     });
     assert.equal(noToken.status, 401);
   });
@@ -341,7 +338,7 @@ describe('push subscriptions', () => {
     assert.ok(body.visitorCount >= 1);
 
     const stored = body.subscriptions.find((item) =>
-      item.endpointHint.startsWith(adminEndpoint.slice(0, 32))
+      item.endpointHint.startsWith(adminEndpoint.slice(0, 32)),
     );
     assert.ok(stored, 'the admin subscription is listed');
     assert.equal(stored.userAgent, 'ci-test');
@@ -359,7 +356,7 @@ describe('push subscriptions', () => {
           sessionId: session,
           endpoint: adminEndpoint,
         }),
-      })
+      }),
     );
     assert.equal(visitorTry.removed, 0);
 
@@ -367,8 +364,8 @@ describe('push subscriptions', () => {
       await fetch(`${backend.url}/api/push/subscriptions`, {
         method: 'DELETE',
         headers: adminHeaders(),
-        body: JSON.stringify({audience: 'admin', endpoint: adminEndpoint}),
-      })
+        body: JSON.stringify({ audience: 'admin', endpoint: adminEndpoint }),
+      }),
     );
     assert.equal(adminDelete.removed, 1);
   });
@@ -381,14 +378,14 @@ describe('push subscriptions', () => {
     await fetch(`${backend.url}/api/push/subscriptions`, {
       method: 'POST',
       headers: adminHeaders(),
-      body: JSON.stringify({audience: 'admin', subscription: fakeSubscription(endpoint)}),
+      body: JSON.stringify({ audience: 'admin', subscription: fakeSubscription(endpoint) }),
     });
 
     const started = Date.now();
     const response = await fetch(`${backend.url}/api/chat`, {
       method: 'POST',
       headers: jsonHeaders(),
-      body: JSON.stringify({sessionId: session, message: 'Push nélkül is menjen'}),
+      body: JSON.stringify({ sessionId: session, message: 'Push nélkül is menjen' }),
     });
     const elapsed = Date.now() - started;
 
@@ -401,7 +398,7 @@ describe('push subscriptions', () => {
     for (let attempt = 0; attempt < 20 && !stored?.lastErrorAt; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 500));
       const body = await readJson(
-        await fetch(`${backend.url}/api/admin/push/subscriptions`, {headers: adminHeaders()})
+        await fetch(`${backend.url}/api/admin/push/subscriptions`, { headers: adminHeaders() }),
       );
       stored = body.subscriptions.find((item) => item.endpointHint.startsWith(hint));
     }
@@ -416,7 +413,7 @@ describe('push switched off', () => {
   let plainBackend;
 
   before(async () => {
-    plainBackend = await startBackend({env: {VAPID_PUBLIC_KEY: '', VAPID_PRIVATE_KEY: ''}});
+    plainBackend = await startBackend({ env: { VAPID_PUBLIC_KEY: '', VAPID_PRIVATE_KEY: '' } });
   });
 
   after(async () => {
@@ -446,7 +443,7 @@ describe('push switched off', () => {
     const response = await fetch(`${plainBackend.url}/api/chat`, {
       method: 'POST',
       headers: jsonHeaders(),
-      body: JSON.stringify({sessionId: session, message: 'Push nélkül is megy'}),
+      body: JSON.stringify({ sessionId: session, message: 'Push nélkül is megy' }),
     });
     assert.equal(response.status, 201);
   });

@@ -1,13 +1,9 @@
 'use client';
 
-import type {ComponentType, SVGProps} from 'react';
-import {motion, type Variants} from 'framer-motion';
-import {
-  skillCategories,
-  type SkillIcon,
-  type SkillCategoryKey,
-} from '@/data/skills';
-import {useText} from './ContentProvider';
+import type { ComponentType, SVGProps } from 'react';
+import { motion, type Variants } from 'framer-motion';
+import { skillCategories, type SkillIcon, type SkillCategoryKey } from '@/data/skills';
+import { useText } from './ContentProvider';
 import {
   Server,
   Container,
@@ -34,12 +30,12 @@ const iconMap: Record<SkillIcon, ComponentType<SVGProps<SVGSVGElement>>> = {
 
 const container: Variants = {
   hidden: {},
-  show: {transition: {staggerChildren: 0.08}},
+  show: { transition: { staggerChildren: 0.08 } },
 };
 
 const card: Variants = {
-  hidden: {opacity: 0, y: 24},
-  show: {opacity: 1, y: 0, transition: {duration: 0.5, ease: 'easeOut'}},
+  hidden: { opacity: 0, y: 24 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' } },
 };
 
 export default function Skills() {
@@ -65,16 +61,14 @@ export default function Skills() {
           <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">
             {subtitle}
           </p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-            {title}
-          </h2>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">{title}</h2>
         </div>
 
         <motion.div
           variants={container}
           initial="hidden"
           whileInView="show"
-          viewport={{once: true, margin: '-60px'}}
+          viewport={{ once: true, margin: '-60px' }}
           className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
         >
           {skillCategories.map((category) => {
@@ -89,9 +83,7 @@ export default function Skills() {
                   <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition-transform group-hover:scale-110">
                     <Icon className="h-5 w-5" />
                   </span>
-                  <h3 className="text-lg font-semibold">
-                    {titles[category.key]}
-                  </h3>
+                  <h3 className="text-lg font-semibold">{titles[category.key]}</h3>
                 </div>
                 <ul className="mt-5 flex flex-wrap gap-2">
                   {category.items.map((item) => (
