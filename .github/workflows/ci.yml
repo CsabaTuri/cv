@@ -264,8 +264,20 @@ jobs:
       - name: Build the static export
         run: npm --prefix cv run build
 
+      # The runner image ships Chrome, and with it the shared libraries Chromium
+      # needs, so the browser download is the only part left. `--with-deps` would
+      # pull ~80 MB of fonts through apt on every single run - the slowest step
+      # here, and the one that has hung. The download itself is cached, keyed on
+      # the lockfile, so a Playwright upgrade starts from an empty cache.
+      - name: Cache the browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 6
+        run: npx playwright install chromium
 
       - name: End-to-end tests
         run: npx playwright test
