@@ -235,16 +235,21 @@ DB_USER=chat DB_PASSWORD=chat ADMIN_TOKEN=ci-admin-token \
 | `tests/content.test.mjs` | a szövegkatalógus: egyedi kulcsok, JSON szerializálás, és hogy a frontend minden kért kulcsa létezik - a megfelelő hookkal |
 | `tests/assets.test.mjs` | a PWA (manifest mezők, ikonok a deklarált méretekkel, a worker handlerei), az nginx szabályok, és a compose invariánsok, amiket ez a stack már elrontott: nincs `latest`, nincs profile a rebuild helperen, a gateway a subnetjén belül, a VAPID kulcsok mindkét szolgáltatáshoz eljutnak, `.env.example` szinkronban |
 
-A [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) öt jobot futtat
+A [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) hat jobot futtat
 minden pull requestnél és a `main`-re való pushnál:
 
 | Job | Mit csinál |
 | --- | --- |
 | `lint` | ESLint és `prettier --check` az egész repository-ra |
 | `site` | typecheck + statikus export, benne a PWA fájlok |
-| `api` | a fenti készlet `mysql:8.4` service ellen, Node 20-on és 22-n |
-| `e2e` | megépíti az exportot, telepíti a Chromiumot, és lefuttatja a Playwright készletet ugyanazon a `mysql:8.4` service-en |
+| `api` | a fenti készlet `mysql:8.4` service ellen, Node 20-on és 22-n (egyszerre 54 teszt) |
+| `e2e` | megépíti az exportot, telepíti a Chromiumot, és lefuttatja a Playwright készletet ugyanazon a `mysql:8.4` service-en (18 teszt) |
+| `summary` | összegyűjti az `api` és `e2e` jelentéseit, és a teljes készletet egy összefoglalóba írja: **72 teszt** egy táblázatban a futás oldalán |
 | `docker` | mindkét overlay, a fail-fast őr `.env` nélkül, `docker compose build`, és `nginx -t` a megépített image-ben |
+
+Minden jobnak saját összefoglalója van, ezért egy job száma még nem a teljes kép:
+a `summary` az, amit először érdemes megnézni — és ez az oka annak is, hogy a unit
+tesztek nem számolódnak kétszer (a két Node verzió ugyanazt az 54-et futtatja).
 
 ### Az eredmények megjelenítése
 
@@ -255,7 +260,8 @@ sem kell extra eszköz vagy külső action:
 
 * **Futás összefoglaló** - a jelentés a `$GITHUB_STEP_SUMMARY`-ba kerül, így a
   job oldalának tetején látszik: összesítés, táblázat suite-onként, és minden
-  hibánál egy lenyitható blokk az üzenettel.
+  hibánál egy lenyitható blokk az üzenettel. A `summary` job ugyanezeket a
+  számokat a teljes készletre (unit + end-to-end) is kiírja a futás oldalára.
 * **Artifact** - a `test-results-node-<verzió>` tartalmazza a JUnit XML-t és a
   markdown jelentést, 14 napig letölthető a futás oldaláról.
 * **Pull request komment** - pull requestnél ugyanez a markdown megy kommentként,

@@ -235,16 +235,21 @@ DB_USER=chat DB_PASSWORD=chat ADMIN_TOKEN=ci-admin-token \
 | `tests/content.test.mjs` | the copy catalogue: unique keys, JSON serialisation, and that every key the frontend asks for exists - with the matching hook |
 | `tests/assets.test.mjs` | the PWA (manifest fields, icons on disk with the declared sizes, the worker's handlers), the nginx rules, and the compose invariants this stack got wrong before: no `latest`, no profile on the rebuild helper, the gateway inside its subnet, the VAPID keys reaching both services, `.env.example` in sync |
 
-[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs five jobs on every
+[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs six jobs on every
 pull request and on pushes to `main`:
 
 | Job | What it does |
 | --- | --- |
 | `lint` | ESLint and `prettier --check` over the whole repository |
 | `site` | typecheck + static export, including the PWA files |
-| `api` | the suite above against a `mysql:8.4` service, on Node 20 and 22 |
-| `e2e` | builds the export, installs Chromium and runs the Playwright suite against the same `mysql:8.4` service |
+| `api` | the suite above against a `mysql:8.4` service, on Node 20 and 22 (54 tests each) |
+| `e2e` | builds the export, installs Chromium and runs the Playwright suite against the same `mysql:8.4` service (18 tests) |
+| `summary` | collects the reports of `api` and `e2e` and writes the whole suite into one summary: **72 tests** in a single table on the run page |
 | `docker` | both overlays, the fail-fast guard without a `.env`, `docker compose build`, and `nginx -t` inside the built image |
+
+Every job has its own summary, so a single job's numbers are never the whole
+story: `summary` is the one to look at first, and it is the reason the unit tests
+are not counted twice (the two Node versions run the same 54).
 
 ### Reading the results
 
@@ -255,7 +260,8 @@ extra tooling or a third-party action:
 
 * **Run summary** - the report is written to `$GITHUB_STEP_SUMMARY`, so it is at
   the top of the job page: totals, a per-suite table and a collapsible block with
-  the message of every failure.
+  the message of every failure. The `summary` job puts the same numbers for the
+  whole suite (unit + end to end) on the run page as well.
 * **Artifact** - `test-results-node-<version>` holds the JUnit XML and the
   markdown itself, kept for 14 days and downloadable from the run page.
 * **Pull request comment** - on a pull request the same markdown is posted as a

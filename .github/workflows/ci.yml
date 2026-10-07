@@ -9,6 +9,8 @@
 #            backend and a real MySQL, with nothing mocked
 #   docker - the compose files and the images themselves, plus the guard that
 #            the stack refuses to start without its secrets
+#   summary- collects the reports of the jobs above into one summary, so the
+#            run page shows the whole suite in one place
 #
 # The tests live in tests/ and need no dependencies: `node --test` with the
 # standard library only. Run them locally with:
@@ -17,6 +19,9 @@
 #   DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=cv_chat_test \
 #   DB_USER=chat DB_PASSWORD=chat ADMIN_TOKEN=ci-admin-token \
 #     node --test tests/*.test.mjs
+#
+# The api and e2e jobs each report their own results, and the summary job at the
+# end joins them: the run page shows the total of everything that ran.
 #
 # Results are reported three ways, all of them without extra tooling:
 #   * the run summary (markdown written to $GITHUB_STEP_SUMMARY)
@@ -299,6 +304,49 @@ jobs:
               "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
           } > test-results/comment.md
           bash .github/scripts/pr-comment.sh cv-ci-report:e2e test-results/comment.md
+
+  # The reports of the jobs above, collected into one summary. The unit suite
+  # runs on two Node versions, so the Node 22 report is the one that is joined:
+  # counting the same tests twice would only make the total confusing.
+  summary:
+    name: Test summary
+    needs: [api, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: test-results-node-22
+          path: reports/unit
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: playwright-report
+          path: reports/e2e
+
+      - name: One summary for the whole suite
+        run: |
+          # Whatever the artifacts happen to contain, the JUnit reports are the
+          # ones to join. Nothing to join (a job failed before it reported) is
+          # not an error here: this step only writes the summary.
+          mapfile -t reports < <(find reports -type f -name '*junit.xml' | sort)
+          if [ "${#reports[@]}" -eq 0 ]; then
+            printf '## 🧪 Test summary\n\n⚠️ No report was uploaded - see the jobs above.\n' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          node .github/scripts/test-summary.mjs "${reports[@]}" \
+            --title "All tests (unit on Node 22 + end to end)"
 
   docker:
     name: Compose files and images
