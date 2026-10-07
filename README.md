@@ -27,7 +27,7 @@ browser ──▶ cv (nginx-unprivileged, uid 101)
 `data` is `internal: true`: MySQL has no internet egress and cannot be reached
 from the host or the LAN. `pma` carries nothing but phpMyAdmin's published port
 (Docker cannot publish a port of a container attached only to internal
-networks). The `app` subnet (`172.31.255.0/24`) is kept fixed on purpose — the
+networks). The `app` subnet (`172.33.255.0/24`) is kept fixed on purpose — the
 host routes it.
 
 The `deployer` helper only starts with the `deploy` profile and publishes

@@ -27,7 +27,7 @@ böngésző ──▶ cv (nginx-unprivileged, uid 101)
 A `data` hálózat `internal: true`: a MySQL-nek nincs internet-egress-e, és a
 hostról/LAN-ról sem érhető el. A `pma` hálózat csak a phpMyAdmin publikált
 portját szolgálja (a Docker nem tud portot publikálni olyan konténeren, ami
-csak internal hálózaton van). Az `app` alhálózata (`172.31.255.0/24`)
+csak internal hálózaton van). Az `app` alhálózata (`172.33.255.0/24`)
 szándékosan fix — a host routolja.
 
 A `deployer` helper csak a `deploy` profile-lal indul, és semmit nem publikál:

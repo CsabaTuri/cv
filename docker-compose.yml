@@ -386,7 +386,7 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.31.255.0/24
+        - subnet: 172.33.255.0/24
           gateway: "172.31.255.1"
 
   # Data tier: no internet egress, unreachable from outside the stack.
