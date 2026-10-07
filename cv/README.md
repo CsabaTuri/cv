@@ -1,6 +1,6 @@
-# Portfolio — Túri Csaba
+# CV — Túri Csaba
 
-Modern, static (SSG) portfolio website built with Next.js (App Router),
+Modern, static (SSG) CV website built with Next.js (App Router),
 TypeScript, Tailwind CSS and Framer Motion. English only.
 
 Nothing is hardcoded in the components: **every text of the site comes from the
@@ -15,7 +15,7 @@ answered.
 
 | Route | Description |
 | --- | --- |
-| `/` | Portfolio with the chat widget (bottom right). |
+| `/` | The CV site with the chat widget (bottom right). |
 | `/admin/` | Admin panel with two tabs: *Üzenetek* (conversation list, thread, reply box) and *Szövegek* (the site copy editor). Asks for the `ADMIN_TOKEN` from `.env` (kept in `localStorage`). Not indexable. |
 
 ## Stack
@@ -51,13 +51,13 @@ npm run build   # outputs ./out
 ## Project structure
 
 ```
-portfolio/
+cv/
 ├── public/              # CV PDFs, robots.txt, sitemap.xml
 ├── src/
 │   ├── app/
 │   │   ├── globals.css
 │   │   ├── layout.tsx   # root layout (metadata, fonts, analytics)
-│   │   ├── page.tsx     # portfolio + chat widget
+│   │   ├── page.tsx     # CV + chat widget
 │   │   ├── global-not-found.tsx
 │   │   └── admin/page.tsx
 │   ├── components/      # UI components (incl. CustomChat, AdminChat)

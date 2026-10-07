@@ -1,6 +1,6 @@
 # chat-backend
 
-Chat API for the portfolio: the visitor widget on one side, the admin inbox on
+Chat API for the CV site: the visitor widget on one side, the admin inbox on
 the other, MySQL in between. No external service and no AI.
 
 ```
@@ -66,5 +66,5 @@ startup; all timestamps are handled in UTC.
 
 ```bash
 npm install
-DB_HOST=127.0.0.1 DB_NAME=portfolio_chat DB_USER=chat DB_PASSWORD=... ADMIN_TOKEN=dev npm start
+DB_HOST=127.0.0.1 DB_NAME=cv_chat DB_USER=chat DB_PASSWORD=... ADMIN_TOKEN=dev npm start
 ```

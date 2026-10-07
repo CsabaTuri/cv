@@ -1,5 +1,5 @@
 # =============================================================================
-# Portfolio + custom chat stack - PRODUCTION overlay
+# CV + custom chat stack - PRODUCTION overlay
 #
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
@@ -14,7 +14,7 @@
 
 services:
 
-  portfolio:
+  cv:
     read_only: true
     logging:
       driver: json-file

@@ -1,5 +1,5 @@
 # =============================================================================
-# Portfolio + custom chat stack - DEVELOPMENT overlay
+# CV + custom chat stack - DEVELOPMENT overlay
 #
 # Applied automatically by `docker compose up -d` (when no -f flag is given).
 # It only adds local conveniences; the hardening of docker-compose.yml stays
@@ -11,7 +11,7 @@
 
 services:
 
-  portfolio:
+  cv:
     # Faster feedback while iterating (production uses the base values).
     healthcheck:
       interval: 10s

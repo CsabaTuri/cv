@@ -1,6 +1,5 @@
 # Local Netlify folder
 .netlify
-portfolio/.netlify
-backend/node_modules
+
 chat-backend/node_modules
 .env

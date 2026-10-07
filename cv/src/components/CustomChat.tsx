@@ -6,7 +6,7 @@ import {MessageCircle, Send, X} from './icons';
 
 // Same-origin: nginx proxies /api/ to the chat-backend service (see nginx.conf).
 const API_BASE = '/api/chat';
-const SESSION_KEY = 'portfolio-chat-session';
+const SESSION_KEY = 'cv-chat-session';
 const POLL_INTERVAL_MS = 3000;
 const MAX_MESSAGE_LENGTH = 4000;
 

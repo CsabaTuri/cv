@@ -18,7 +18,7 @@ const CLOUDFLARE_TOKEN =
 // database and are applied in ContentProvider.
 const TITLE = 'Túri Csaba — DevOps és Rendszerüzemeltetési Szakember';
 const DESCRIPTION =
-  'Túri Csaba portfóliója: DevOps és rendszerüzemeltetési szakember, automatizálásra, virtualizációra, konténerizációra és Linux infrastruktúrára fókuszálva.';
+  'Túri Csaba önéletrajza: DevOps és rendszerüzemeltetési szakember, automatizálásra, virtualizációra, konténerizációra és Linux infrastruktúrára fókuszálva.';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://turicsaba.hu'),

@@ -1,5 +1,5 @@
 # =============================================================================
-# Portfolio + custom chat stack - BASE file (dev and prod share it)
+# CV + custom chat stack - BASE file (dev and prod share it)
 #
 #   dev  : docker compose up -d
 #          (base + docker-compose.override.yml, which is applied automatically)
@@ -32,16 +32,16 @@ x-logging: &logging
 services:
 
   # ---------------------------------------------------------------------------
-  # portfolio - static site (Next.js SSG) + admin UI, served by nginx.
+  # cv - static CV site (Next.js SSG) + admin UI, served by nginx.
   # ---------------------------------------------------------------------------
-  portfolio:
+  cv:
     build:
-      context: ./portfolio
+      context: ./cv
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN: ${NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN:-}
-    image: cv-portfolio:latest
-    container_name: portfolio
+    image: cv-web:latest
+    container_name: cv
     restart: unless-stopped
     depends_on:
       chat-backend:

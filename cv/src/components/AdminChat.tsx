@@ -4,7 +4,7 @@ import {useEffect, useState} from 'react';
 import ChatInbox from './ChatInbox';
 import ContentEditor from './ContentEditor';
 
-const TOKEN_KEY = 'portfolio-chat-admin-token';
+const TOKEN_KEY = 'cv-chat-admin-token';
 
 export default function AdminChat() {
   const [token, setToken] = useState('');
@@ -96,7 +96,7 @@ export default function AdminChat() {
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
           <div>
             <h1 className="text-lg font-semibold">Admin</h1>
-            <p className="text-xs text-gray-500">Portfólió kezelése</p>
+            <p className="text-xs text-gray-500">Önéletrajz kezelése</p>
           </div>
 
           <nav className="flex items-center gap-2">

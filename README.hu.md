@@ -1,13 +1,13 @@
-# Portfólió + egyedi chat stack
+# Önéletrajz + egyedi chat stack
 
 [English version](./README.md) · **Magyar**
 
-Statikus portfólió oldal (Next.js SSG, nginx szolgálja ki) saját chattel:
+Statikus önéletrajz oldal (Next.js SSG, nginx szolgálja ki) saját chattel:
 látogatói chat widget, admin beérkező (inbox) és egy kisebb CMS az oldal
 szövegeihez — nincs harmadik féltől származó chat szolgáltatás és nincs AI.
 
 ```
-böngésző ──▶ portfolio (nginx-unprivileged, uid 101)
+böngésző ──▶ cv (nginx-unprivileged, uid 101)
               ├── /                  statikus oldal
               ├── /admin/            inbox + szövegszerkesztő
               └── /api/*  ──▶ chat-backend (Node) ──▶ mysql (belső hálózat)
@@ -18,7 +18,7 @@ böngésző ──▶ portfolio (nginx-unprivileged, uid 101)
 
 | Szolgáltatás | Image | Publikált port | Hálózatok | Megjegyzés |
 | --- | --- | --- | --- | --- |
-| `portfolio` | `cv-portfolio:latest` (nginx-unprivileged, uid 101) | `3036:8080` a `SITE_BIND`-en (alap: `0.0.0.0`) | `app` | Statikus oldal + `/api` reverse proxy. Read-only rootfs, minden capability eldobva. |
+| `cv` | `cv-web:latest` (nginx-unprivileged, uid 101) | `3036:8080` a `SITE_BIND`-en (alap: `0.0.0.0`) | `app` | Statikus oldal + `/api` reverse proxy. Read-only rootfs, minden capability eldobva. |
 | `chat-backend` | `cv-chat-backend:latest` (Node 20, `nodejs` user) | `3112:3000` | `app`, `data` | Chat + admin API. Read-only rootfs, minden capability eldobva. |
 | `mysql` | `mysql:8.4` | nincs | `data` (internal) | Üzenetek, beszélgetések, oldal-szövegek. |
 | `phpmyadmin` | `phpmyadmin:5-apache` | `8081:80` | `data`, `pma` | Adatbázis UI az üzemeltetőnek. |
@@ -133,5 +133,5 @@ cseréjekor ezt tartsd meg.
 
 ## Dokumentáció
 
-* [portfolio/README.md](./portfolio/README.md) — statikus oldal, oldalak, build.
+* [cv/README.md](./cv/README.md) — statikus önéletrajz oldal, oldalak, build.
 * [chat-backend/README.md](./chat-backend/README.md) — API végpontok, séma.

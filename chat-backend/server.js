@@ -1,6 +1,6 @@
 // chat-backend/server.js
 //
-// Chat API for the portfolio: the visitor widget on the left, the admin inbox
+// Chat API for the CV site: the visitor widget on the left, the admin inbox
 // on the right, MySQL underneath. No external service, no AI.
 //
 // Visitor API:

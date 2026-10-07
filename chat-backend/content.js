@@ -1,6 +1,6 @@
 // chat-backend/content.js
 //
-// The editable copy of the portfolio. Every visible text of the site lives
+// The editable copy of the CV site. Every visible text of the site lives
 // here as a *default*: the values are seeded into the `site_content` table on
 // startup (existing rows are never overwritten), the site reads them through
 // GET /api/content, and the admin page edits them.
@@ -22,7 +22,7 @@ export const CONTENT_FIELDS = [
     label: 'Meta leírás',
     multiline: true,
     value:
-      'Túri Csaba portfóliója: DevOps és rendszerüzemeltetési szakember, automatizálásra, virtualizációra, konténerizációra és Linux infrastruktúrára fókuszálva.',
+      'Túri Csaba önéletrajza: DevOps és rendszerüzemeltetési szakember, automatizálásra, virtualizációra, konténerizációra és Linux infrastruktúrára fókuszálva.',
   },
 
   // --- general ----------------------------------------------------------

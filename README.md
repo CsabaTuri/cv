@@ -1,13 +1,13 @@
-# Portfolio + custom chat stack
+# CV + custom chat stack
 
 [Magyar verzió](./README.hu.md) · **English**
 
-A static portfolio site (Next.js SSG, served by nginx) with its own chat: a
+A static CV site (Next.js SSG, served by nginx) with its own chat: a
 visitor widget, an admin inbox and a small CMS for the site copy — no
 third-party chat provider, no AI.
 
 ```
-browser ──▶ portfolio (nginx-unprivileged, uid 101)
+browser ──▶ cv (nginx-unprivileged, uid 101)
               ├── /                  static site
               ├── /admin/            inbox + site copy editor
               └── /api/*  ──▶ chat-backend (Node) ──▶ mysql (internal network)
@@ -18,7 +18,7 @@ browser ──▶ portfolio (nginx-unprivileged, uid 101)
 
 | Service | Image | Published | Networks | Notes |
 | --- | --- | --- | --- | --- |
-| `portfolio` | `cv-portfolio:latest` (nginx-unprivileged, uid 101) | `3036:8080` on `SITE_BIND` (default `0.0.0.0`) | `app` | Static site + `/api` reverse proxy. Read-only rootfs, all capabilities dropped. |
+| `cv` | `cv-web:latest` (nginx-unprivileged, uid 101) | `3036:8080` on `SITE_BIND` (default `0.0.0.0`) | `app` | Static site + `/api` reverse proxy. Read-only rootfs, all capabilities dropped. |
 | `chat-backend` | `cv-chat-backend:latest` (Node 20, user `nodejs`) | `3112:3000` | `app`, `data` | Chat + admin API. Read-only rootfs, all capabilities dropped. |
 | `mysql` | `mysql:8.4` | none | `data` (internal) | Messages, conversations, site copy. |
 | `phpmyadmin` | `phpmyadmin:5-apache` | `8081:80` | `data`, `pma` | Database UI for the operator. |
@@ -134,5 +134,5 @@ compose files.
 
 ## Documentation
 
-* [portfolio/README.md](./portfolio/README.md) — static site, pages, build.
+* [cv/README.md](./cv/README.md) — static CV site, pages, build.
 * [chat-backend/README.md](./chat-backend/README.md) — API endpoints, schema.
