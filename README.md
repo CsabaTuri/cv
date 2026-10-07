@@ -18,11 +18,11 @@ browser ──▶ cv (nginx-unprivileged, uid 101)
 
 | Service | Image | Published | Networks | Notes |
 | --- | --- | --- | --- | --- |
-| `cv` | `cv-web:latest` (nginx-unprivileged, uid 101) | `3036:8080` on `SITE_BIND` (default `0.0.0.0`) | `app` | Static site + `/api` reverse proxy. Read-only rootfs, all capabilities dropped. |
-| `chat-backend` | `cv-chat-backend:latest` (Node 20, user `nodejs`) | `3112:3000` | `app`, `data` | Chat + admin API. Read-only rootfs, all capabilities dropped. |
-| `mysql` | `mysql:8.4` | none | `data` (internal) | Messages, conversations, site copy. |
+| `cv` | `cv-web:${IMAGE_TAG}` (nginx-unprivileged, uid 101) | `3036:8080` on `SITE_BIND` (default `0.0.0.0`) | `app` | Static site + `/api` reverse proxy. Read-only rootfs, all capabilities dropped. |
+| `chat-backend` | `cv-chat-backend:${IMAGE_TAG}` (Node 20, user `nodejs`) | `3112:3000` | `app`, `data` | Chat + admin API. Read-only rootfs, all capabilities dropped. |
+| `mysql` | `mysql:8.4` | none | `data` (internal) | Messages, conversations, site copy. Read-only rootfs, capabilities denied by default. |
 | `phpmyadmin` | `phpmyadmin:5-apache` | `8081:80` | `data`, `pma` | Database UI for the operator. |
-| `deployer` | `cv-deployer:latest` (Node 20 + Docker CLI) | none | `app` | Opt-in rebuild helper (compose profile `deploy`). Holds the Docker socket; see [One-click rebuild](#one-click-rebuild-admin-panel). |
+| `deployer` | `cv-deployer:${IMAGE_TAG}` (Node 20 + Docker CLI) | none | `app` | Opt-in rebuild helper (compose profile `deploy`). Holds the Docker socket; see [One-click rebuild](#one-click-rebuild-admin-panel). |
 
 `data` is `internal: true`: MySQL has no internet egress and cannot be reached
 from the host or the LAN. `pma` carries nothing but phpMyAdmin's published port
@@ -126,7 +126,8 @@ See [`.env.example`](./.env.example) for the documented template.
 | --- | --- |
 | `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD` | Database and application credentials (required). |
 | `ADMIN_TOKEN` | Guards the admin API and logs into `/admin` (required). |
-| `TZ` | Time zone for MySQL/phpMyAdmin. |
+| `TZ` | Time zone for MySQL/phpMyAdmin and the backend. |
+| `IMAGE_TAG` | **Required**: the tag every image is built and run with. A concrete version only, never `latest`; see *Rollback* below. |
 | `SITE_BIND`, `API_BIND`, `PHPMYADMIN_BIND` | Host interfaces the ports are bound to. |
 | `NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN` | Optional analytics token, baked in at build time. |
 | `DEPLOY_ENABLED` | Allows the rebuild helper to act (`false` by default). |
@@ -135,17 +136,33 @@ See [`.env.example`](./.env.example) for the documented template.
 | `DEPLOY_SOURCE_DIR` | Source tree the helper mounts (default: the stack directory). |
 
 Compose fails fast when a required value is missing (`${VAR:?}`), so the stack
-can never start with an empty password — see the error when running
-`docker compose config` with an empty `ADMIN_TOKEN`.
+can neither start with an empty password nor without a version — see the error
+when running `docker compose config` with an empty `ADMIN_TOKEN`, or without
+`IMAGE_TAG`.
 
 ## Security measures
 
 * No default credentials anywhere; missing values abort the deploy.
-* Database on an `internal` network, no published port, `--local-infile=OFF`.
-* `no-new-privileges` everywhere; `cap_drop: [ALL]` for nginx and the Node
-  backend; only the clearly unnecessary capabilities dropped for MySQL and
-  phpMyAdmin (both must drop privileges / bind port 80 at startup).
-* Read-only root filesystems with small `tmpfs` mounts (nginx, Node backend).
+* Database on an `internal` network, no published port, `--local-infile=OFF`,
+  `--skip-name-resolve` and a slow query log (`--long-query-time=2`) kept at
+  `/var/lib/mysql/slow.log`.
+* Capability and AppArmor note: capabilities are denied by default rather than
+  "all but a few", and no `apparmor=` profile is pinned — Docker applies its
+  default profile where the host supports AppArmor, while an explicit pin would
+  refuse to start on a host without it.
+* `no-new-privileges` everywhere, and **every** service runs with
+  `cap_drop: [ALL]` plus an explicit `cap_add` list of the few capabilities its
+  entrypoint really needs (MySQL/phpMyAdmin drop privileges at startup; nginx
+  needs to bind port 80).
+* Read-only root filesystems with small `tmpfs` mounts everywhere they are
+  possible: nginx, the Node backend, the deployer helper and MySQL (data on the
+  volume, socket and temp files on tmpfs). phpMyAdmin is the documented
+  exception: its entrypoint writes the session blowfish secret into
+  `/etc/phpmyadmin` on every start.
+* File descriptor limits per service; `stop_grace_period` for every long-running
+  service (nginx drains on SIGQUIT, the API finishes in-flight requests and
+  closes the pool), and `start_interval` so a cold start converges in seconds
+  instead of waiting a full health interval.
 * Non-root runtime users (uid 101 / `nodejs`), `init: true` for signal handling.
 * Admin API and database UI bound to the host loopback interface in production;
   only the site is public.
@@ -169,21 +186,45 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 docker compose pull && docker compose up -d        # update images
 ```
 
-Backup / restore:
+Backup / restore (the password goes through `MYSQL_PWD`, so it never shows up
+in the container's process list):
 
 ```bash
-# backup
-docker compose exec -T mysql sh -c \
-  'exec mysqldump -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' \
+# backup (consistent snapshot, no table locks)
+docker compose exec -T -e MYSQL_PWD="$MYSQL_PASSWORD" mysql sh -c \
+  'exec mysqldump -u"$MYSQL_USER" --single-transaction --routines --events "$MYSQL_DATABASE"' \
   | gzip > "chat-$(date +%F).sql.gz"
 
 # restore
-gunzip -c chat-2026-10-07.sql.gz | docker compose exec -T mysql sh -c \
-  'exec mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'
+gunzip -c chat-2026-10-07.sql.gz | docker compose exec -T -e MYSQL_PWD="$MYSQL_PASSWORD" mysql sh -c \
+  'exec mysql -u"$MYSQL_USER" "$MYSQL_DATABASE"'
 ```
 
 The chat data lives in the named volume `cv_mysql-data`; keep it when changing
 compose files.
+
+Slow queries:
+
+```bash
+docker compose exec mysql cat /var/lib/mysql/slow.log
+```
+
+Rollback:
+
+```bash
+# release: bump IMAGE_TAG in .env, then rebuild
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+# rollback: put the previous version back in .env, then start (no rebuild)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+The second command only works because the tag is a concrete version: the compose
+files refuse `latest` (and refuse to start without a tag at all), and the
+previous image is still on the host — do not prune it away. Rollback of the
+*database* is a restore from a dump: the schema is created with
+`CREATE TABLE IF NOT EXISTS`, so an older image against a newer schema needs a
+restore as well.
 
 ## Documentation
 

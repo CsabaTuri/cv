@@ -33,7 +33,8 @@ services:
     ports:
       # Admin API: loopback only, whatever .env says.
       - "127.0.0.1:3112:3000"
-    stop_grace_period: 15s
+    # Production gets a longer drain window than the base file.
+    stop_grace_period: 30s
     ulimits:
       nofile:
         soft: 4096

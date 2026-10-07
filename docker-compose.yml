@@ -40,12 +40,14 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN: ${NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN:-}
-    image: cv-web:latest
+    image: cv-web:${IMAGE_TAG:?IMAGE_TAG is missing from .env (never use `latest`)}
     container_name: cv
     restart: unless-stopped
     depends_on:
       chat-backend:
-        condition: service_started
+        # Wait for a working API rather than for the process to exist: until
+        # the backend is healthy, nginx answers 502 to the chat widget.
+        condition: service_healthy
     ports:
       - "${SITE_BIND:-0.0.0.0}:3036:8080"
     read_only: true
@@ -58,12 +60,20 @@ services:
     cap_drop:
       - ALL
     init: true
+    # The image's STOPSIGNAL is SIGQUIT, so nginx drains the connections it is
+    # still serving instead of cutting them off.
+    stop_grace_period: 20s
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 8192
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+      start_interval: 5s
     deploy:
       resources:
         limits:
@@ -81,7 +91,7 @@ services:
     build:
       context: ./chat-backend
       dockerfile: Dockerfile
-    image: cv-chat-backend:latest
+    image: cv-chat-backend:${IMAGE_TAG:?IMAGE_TAG is missing from .env (never use `latest`)}
     container_name: chat_backend
     restart: unless-stopped
     depends_on:
@@ -96,6 +106,7 @@ services:
       DB_USER: ${MYSQL_USER:?MYSQL_USER is missing from .env}
       DB_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is missing from .env}
       ADMIN_TOKEN: ${ADMIN_TOKEN:?ADMIN_TOKEN is missing from .env}
+      TZ: ${TZ:-Europe/Budapest}
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=16m
@@ -104,12 +115,19 @@ services:
     cap_drop:
       - ALL
     init: true
+    # On SIGTERM the backend stops accepting connections and closes the pool.
+    stop_grace_period: 15s
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 8192
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 20s
+      start_interval: 5s
     deploy:
       resources:
         limits:
@@ -141,18 +159,34 @@ services:
       - --local-infile=OFF
       - --max-connections=100
       - --max-allowed-packet=16M
+      # Containers reach it over the `data` network only; Docker DNS names would
+      # need a reverse lookup per connection, which is pure overhead here.
+      - --bind-address=0.0.0.0
+      - --skip-name-resolve
+      # Query log for the operator; 2 s is slow for this workload.
+      - --slow-query-log=1
+      - --long-query-time=2
+      - --slow-query-log-file=/var/lib/mysql/slow.log
     volumes:
       - mysql-data:/var/lib/mysql
+    # Everything MySQL writes lives on the volume or on a tmpfs, so the image
+    # itself is never modified at runtime.
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+      - /var/run/mysqld:rw,noexec,nosuid,size=16m
     security_opt:
       - no-new-privileges:true
+    # Deny by default: the entrypoint prepares the data directory and drops to
+    # the mysql user, which needs exactly these five.
     cap_drop:
-      # The entrypoint needs CHOWN/DAC_OVERRIDE/SETUID/SETGID to prepare the
-      # data directory and drop to the mysql user; the rest is unnecessary.
-      - NET_RAW
-      - SETPCAP
-      - AUDIT_WRITE
-      - NET_BIND_SERVICE
-      - MKNOD
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
     # Give InnoDB time to shut down cleanly.
     stop_grace_period: 30s
     healthcheck:
@@ -163,6 +197,7 @@ services:
       timeout: 5s
       retries: 12
       start_period: 30s
+      start_interval: 5s
     deploy:
       resources:
         limits:
@@ -205,21 +240,25 @@ services:
       - /var/lock/apache2:rw,noexec,nosuid,size=8m
     security_opt:
       - no-new-privileges:true
+    # Deny by default. The Apache entrypoint drops privileges to www-data
+    # (SETUID/SETGID/CHOWN/DAC_OVERRIDE/FOWNER) and binds port 80
+    # (NET_BIND_SERVICE) - exactly these are allowed back.
     cap_drop:
-      # Needed capabilities are kept: the Apache entrypoint drops privileges
-      # to www-data (SETUID/SETGID/CHOWN/DAC_OVERRIDE) and binds port 80
-      # (NET_BIND_SERVICE). The rest is unnecessary.
-      - NET_RAW
-      - SETPCAP
-      - AUDIT_WRITE
-      - MKNOD
-      - FSETID
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETUID
+      - SETGID
+      - NET_BIND_SERVICE
     healthcheck:
       test: ["CMD", "php", "-r", "exit(@fsockopen('127.0.0.1', 80) ? 0 : 1);"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 20s
+      start_interval: 5s
     deploy:
       resources:
         limits:
@@ -253,14 +292,14 @@ services:
     build:
       context: ./deployer
       dockerfile: Dockerfile
-    image: cv-deployer:latest
+    image: cv-deployer:${IMAGE_TAG:?IMAGE_TAG is missing from .env (never use `latest`)}
     container_name: cv_deployer
     restart: unless-stopped
     profiles:
       - deploy
     depends_on:
       chat-backend:
-        condition: service_started
+        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: "4000"
@@ -288,6 +327,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:?MYSQL_USER is missing from .env}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is missing from .env}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is missing from .env}
+      IMAGE_TAG: ${IMAGE_TAG:?IMAGE_TAG is missing from .env}
       SITE_BIND: ${SITE_BIND:-0.0.0.0}
       API_BIND: ${API_BIND:-127.0.0.1}
       PHPMYADMIN_BIND: ${PHPMYADMIN_BIND:-127.0.0.1}
@@ -302,7 +342,8 @@ services:
       - deploy-state:/state
     read_only: true
     tmpfs:
-      - /tmp:rw,noexec,nosuid,size=64m
+      # Build tooling writes here; the size is only an upper bound.
+      - /tmp:rw,noexec,nosuid,size=256m
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -317,6 +358,7 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+      start_interval: 5s
     deploy:
       resources:
         limits:

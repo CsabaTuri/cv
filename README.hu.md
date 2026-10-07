@@ -18,11 +18,11 @@ böngésző ──▶ cv (nginx-unprivileged, uid 101)
 
 | Szolgáltatás | Image | Publikált port | Hálózatok | Megjegyzés |
 | --- | --- | --- | --- | --- |
-| `cv` | `cv-web:latest` (nginx-unprivileged, uid 101) | `3036:8080` a `SITE_BIND`-en (alap: `0.0.0.0`) | `app` | Statikus oldal + `/api` reverse proxy. Read-only rootfs, minden capability eldobva. |
-| `chat-backend` | `cv-chat-backend:latest` (Node 20, `nodejs` user) | `3112:3000` | `app`, `data` | Chat + admin API. Read-only rootfs, minden capability eldobva. |
-| `mysql` | `mysql:8.4` | nincs | `data` (internal) | Üzenetek, beszélgetések, oldal-szövegek. |
+| `cv` | `cv-web:${IMAGE_TAG}` (nginx-unprivileged, uid 101) | `3036:8080` a `SITE_BIND`-en (alap: `0.0.0.0`) | `app` | Statikus oldal + `/api` reverse proxy. Read-only rootfs, minden capability eldobva. |
+| `chat-backend` | `cv-chat-backend:${IMAGE_TAG}` (Node 20, `nodejs` user) | `3112:3000` | `app`, `data` | Chat + admin API. Read-only rootfs, minden capability eldobva. |
+| `mysql` | `mysql:8.4` | nincs | `data` (internal) | Üzenetek, beszélgetések, oldal-szövegek. Read-only rootfs, deny-by-default capability-k. |
 | `phpmyadmin` | `phpmyadmin:5-apache` | `8081:80` | `data`, `pma` | Adatbázis UI az üzemeltetőnek. |
-| `deployer` | `cv-deployer:latest` (Node 20 + Docker CLI) | nincs | `app` | Opcionális rebuild helper (compose profile: `deploy`). Övé a Docker socket; lásd [Újrabuildelés](#újrabuildelés-egy-gombnyomásra-admin-panel). |
+| `deployer` | `cv-deployer:${IMAGE_TAG}` (Node 20 + Docker CLI) | nincs | `app` | Opcionális rebuild helper (compose profile: `deploy`). Övé a Docker socket; lásd [Újrabuildelés](#újrabuildelés-egy-gombnyomásra-admin-panel). |
 
 A `data` hálózat `internal: true`: a MySQL-nek nincs internet-egress-e, és a
 hostról/LAN-ról sem érhető el. A `pma` hálózat csak a phpMyAdmin publikált
@@ -125,7 +125,8 @@ A dokumentált sablon: [`.env.example`](./.env.example).
 | --- | --- |
 | `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD` | Adatbázis és alkalmazás credentialek (kötelező). |
 | `ADMIN_TOKEN` | Az admin API-t védi, és ezzel lépsz be a `/admin` oldalra (kötelező). |
-| `TZ` | Időzóna a MySQL/phpMyAdmin számára. |
+| `TZ` | Időzóna a MySQL/phpMyAdmin és a backend számára. |
+| `IMAGE_TAG` | **Kötelező**: ezzel a taggel épül és fut minden image. Csak konkrét verzió, soha nem `latest`; lásd *Visszaállás*. |
 | `SITE_BIND`, `API_BIND`, `PHPMYADMIN_BIND` | Mely host interfészekre kötődjenek a portok. |
 | `NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN` | Opcionális analytics token, build időben kerül a bundle-be. |
 | `DEPLOY_ENABLED` | Engedélyezi, hogy a rebuild helper cselekedjen (alap: `false`). |
@@ -134,17 +135,30 @@ A dokumentált sablon: [`.env.example`](./.env.example).
 | `DEPLOY_SOURCE_DIR` | A helper által mountolt forráskönyvtár (alap: a stack könyvtára). |
 
 A compose **fail-fast**: hiányzó kötelező érték esetén (`${VAR:?}`) nem indul
-el gyenge jelszóval — próbáld ki üres `ADMIN_TOKEN`-nel a
-`docker compose config` paranccsal.
+el gyenge jelszóval, és verzió nélkül sem — próbáld ki üres `ADMIN_TOKEN`-nel,
+vagy `IMAGE_TAG` nélkül a `docker compose config` paranccsal.
 
 ## Biztonsági intézkedések
 
 * Nincs sehol default credential; hiányzó érték megállítja a deployt.
-* Az adatbázis `internal` hálózaton, publikált port nélkül, `--local-infile=OFF`.
-* Mindenhol `no-new-privileges`; az nginx és a Node backend `cap_drop: [ALL]`;
-  a MySQL/phpMyAdmin esetében csak a felesleges capability-k vannak eldobva
-  (mindkettőnek rootból kell leváltania / a 80-as portra kötnie induláskor).
-* Read-only rootfs kis `tmpfs` mountokkal (nginx, Node backend).
+* Az adatbázis `internal` hálózaton, publikált port nélkül, `--local-infile=OFF`,
+  `--skip-name-resolve`, és slow query log (`--long-query-time=2`) a
+  `/var/lib/mysql/slow.log` fájlban.
+* Capability és AppArmor megjegyzés: a capability-k deny-by-default módon vannak
+  megadva (nem „mind, kivéve néhány"), és nincs beégetett `apparmor=` profil —
+  a Docker ott alkalmazza a saját default profilját, ahol a host támogatja, egy
+  explicit pin viszont el sem indulna AppArmor nélküli hoston.
+* Mindenhol `no-new-privileges`, és **minden** szolgáltatás `cap_drop: [ALL]`-lal
+  fut, plusz egy explicit `cap_add` listával arról, ami tényleg kell (a
+  MySQL/phpMyAdmin rootból vált le induláskor, az nginxnek a 80-as port kell).
+* Read-only rootfs kis `tmpfs` mountokkal mindenhol, ahol lehetséges: nginx,
+  Node backend, a deployer helper és a MySQL (adat a volume-on, socket és temp
+  fájlok tmpfs-en). A phpMyAdmin a dokumentált kivétel: az entrypointja minden
+  indulásnál beírja a session blowfish secretet az `/etc/phpmyadmin` alá.
+* Fájlleíró limit szolgáltatásonként; `stop_grace_period` minden hosszan futó
+  szolgáltatásnál (az nginx SIGQUIT-ra kiüríti a kapcsolatokat, az API befejezi
+  a futó kéréseket és lezárja a poolt), és `start_interval`, hogy a hideg
+  indítás másodpercek alatt összeálljon.
 * Nem-root futásidejű userek (uid 101 / `nodejs`), `init: true` a szignálkezeléshez.
 * Élesben az admin API és az adatbázis UI a host loopbackjére kötve; csak a
   weboldal publikus.
@@ -168,21 +182,44 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 docker compose pull && docker compose up -d        # image-ek frissítése
 ```
 
-Mentés / visszaállítás:
+Mentés / visszaállítás (a jelszó `MYSQL_PWD`-n keresztül megy, így nem kerül a
+konténer process listájába):
 
 ```bash
-# mentés
-docker compose exec -T mysql sh -c \
-  'exec mysqldump -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' \
+# mentés (konzisztens pillanatkép, tábla-zár nélkül)
+docker compose exec -T -e MYSQL_PWD="$MYSQL_PASSWORD" mysql sh -c \
+  'exec mysqldump -u"$MYSQL_USER" --single-transaction --routines --events "$MYSQL_DATABASE"' \
   | gzip > "chat-$(date +%F).sql.gz"
 
 # visszaállítás
-gunzip -c chat-2026-10-07.sql.gz | docker compose exec -T mysql sh -c \
-  'exec mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"'
+gunzip -c chat-2026-10-07.sql.gz | docker compose exec -T -e MYSQL_PWD="$MYSQL_PASSWORD" mysql sh -c \
+  'exec mysql -u"$MYSQL_USER" "$MYSQL_DATABASE"'
 ```
 
 A chat adatai a `cv_mysql-data` named volume-ban vannak; compose fájlok
 cseréjekor ezt tartsd meg.
+
+Lassú lekérdezések:
+
+```bash
+docker compose exec mysql cat /var/lib/mysql/slow.log
+```
+
+Visszaállás (rollback):
+
+```bash
+# kiadás: emeld az IMAGE_TAG-et a .env-ben, majd build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+# visszaállás: tedd vissza az előző verziót a .env-ben, majd indítás (build nélkül)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+A második parancs csak azért működik, mert a tag konkrét verzió: a compose
+fájlok elutasítják a `latest`-et (és tag nélkül el sem indulnak), az előző image
+pedig ott marad a hoston — ne pruneld ki. Az *adatbázis* visszaállítása dumpból
+történik: a séma `CREATE TABLE IF NOT EXISTS`-szel jön létre, ezért egy régebbi
+image egy újabb séma ellen szintén restore-t igényel.
 
 ## Dokumentáció
 
