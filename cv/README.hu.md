@@ -5,6 +5,10 @@
 Modern, statikus (SSG) önéletrajz oldal Next.js-szel (App Router), TypeScript,
 Tailwind CSS és Framer Motion felhasználásával. Az oldal magyar nyelvű.
 
+Az oldal telepíthető PWA (manifest, ikonok, service worker offline héjjal), és
+Web Push értesítéseket tud fogadni — lásd
+[../README.hu.md](../README.hu.md#telepíthető-alkalmazás-és-értesítések).
+
 A komponensekben **nincs beégetett szöveg**: az oldal minden szövege az
 adatbázisból jön (`GET /api/content`, az `/admin` oldal *Szövegek* fülével
 szerkeszthető). Amíg egy érték nem létezik, `…` helykitöltő látszik.

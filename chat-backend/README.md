@@ -25,6 +25,11 @@ while the chat panel is open.
 | `GET` | `/api/admin/conversations` | Inbox list with unread counts and the last message. |
 | `GET` | `/api/admin/conversations/:id/messages?afterId=` | Full thread of one conversation. |
 | `POST` | `/api/admin/conversations/:id/reply` | `{ message }` → stored as an `admin` message. |
+| `GET` | `/api/push/public-key` | `{ ok, enabled, key }` — the VAPID public key for the browser subscription. |
+| `POST` | `/api/push/subscriptions` | `{ audience, sessionId?, subscription, userAgent? }` → `201`. `visitor` needs a `sessionId`, `admin` the admin token. |
+| `DELETE` | `/api/push/subscriptions` | `{ audience, sessionId?, endpoint }` → `{ ok, removed }`. |
+| `GET` | `/api/admin/push/subscriptions` | Admin subscriptions (endpoints truncated), plus the visitor count. |
+| `POST` | `/api/admin/push/test` | `{ ok, sent, failed }` — test notification to the admin's browsers. |
 
 Every `/api/admin/*` request needs `Authorization: Bearer <ADMIN_TOKEN>` (the
 `/admin` page asks for the token once and stores it in `localStorage`).
@@ -55,14 +60,34 @@ renders as bold, `json: true` fields hold lists (e.g. the experience cards).
 | --- | --- |
 | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | MySQL connection. |
 | `ADMIN_TOKEN` | Guards `/api/admin/*`. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push key pair (optional: without it the notifications are off). |
 | `PORT` | Listen port (default `3000`). |
+
+## Push notifications
+
+Web Push, so a notification arrives with the site closed. Subscriptions are kept
+in `push_subscriptions` (endpoint, `p256dh`, `auth`, audience, conversation,
+user-agent, delivery timestamps) and are sent with `web-push`:
+
+* a **visitor** message notifies every `admin` subscription;
+* an **admin** reply notifies the `visitor` subscriptions of that conversation.
+
+The payload is `{ title, body, url, tag }`; the title comes from the site copy
+(`notify.*` keys, editable on the admin page), the body is the truncated message.
+Sending is fire-and-forget: a push problem never fails the API call. A `404`/`410`
+from the push service means the browser dropped the subscription, so the row is
+deleted; other errors only set `last_error_at`.
+
+Without `VAPID_*` in the environment the feature stays off and the subscription
+endpoints answer `503`.
 
 ## Database
 
 `conversations` (id, timestamps, visitor ip/user-agent), `messages`
-(id, conversation_id, `role` = `visitor`/`admin`, body, created_at) and
-`site_content` (key, value, updated_at). The tables are created automatically on
-startup; all timestamps are handled in UTC.
+(id, conversation_id, `role` = `visitor`/`admin`, body, created_at),
+`site_content` (key, value, updated_at) and `push_subscriptions` (endpoint,
+keys, audience, conversation, user-agent, delivery timestamps). The tables are
+created automatically on startup; all timestamps are handled in UTC.
 
 ## Local development
 

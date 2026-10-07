@@ -5,6 +5,10 @@
 Modern, static (SSG) CV website built with Next.js (App Router),
 TypeScript, Tailwind CSS and Framer Motion. The site itself is Hungarian.
 
+The site is an installable PWA (manifest, icons, service worker with an offline
+shell) and it can send/receive Web Push notifications - see
+[../README.md](../README.md#installable-app-and-notifications).
+
 Nothing is hardcoded in the components: **every text of the site comes from the
 database** (`GET /api/content`, editable on the `/admin` page under *Szövegek*).
 Until a value exists, a `…` placeholder is shown.

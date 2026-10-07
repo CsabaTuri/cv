@@ -107,6 +107,10 @@ services:
       DB_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is missing from .env}
       ADMIN_TOKEN: ${ADMIN_TOKEN:?ADMIN_TOKEN is missing from .env}
       TZ: ${TZ:-Europe/Budapest}
+      # Web Push: empty keys simply disable the notifications.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=16m
@@ -330,6 +334,9 @@ services:
       IMAGE_TAG_CV: ${IMAGE_TAG_CV:?IMAGE_TAG_CV is missing from .env}
       IMAGE_TAG_CHAT_BACKEND: ${IMAGE_TAG_CHAT_BACKEND:?IMAGE_TAG_CHAT_BACKEND is missing from .env}
       IMAGE_TAG_DEPLOYER: ${IMAGE_TAG_DEPLOYER:?IMAGE_TAG_DEPLOYER is missing from .env}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       SITE_BIND: ${SITE_BIND:-0.0.0.0}
       API_BIND: ${API_BIND:-127.0.0.1}
       PHPMYADMIN_BIND: ${PHPMYADMIN_BIND:-127.0.0.1}

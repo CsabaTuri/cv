@@ -2,6 +2,7 @@ import type {ReactNode} from 'react';
 import type {Metadata, Viewport} from 'next';
 import {Inter} from 'next/font/google';
 import {ContentProvider} from '@/components/ContentProvider';
+import PwaSetup from '@/components/PwaSetup';
 import './globals.css';
 
 const inter = Inter({
@@ -25,6 +26,22 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: {canonical: '/'},
+  // Installable app (PWA): manifest + the icon set the browsers ask for.
+  manifest: '/manifest.webmanifest',
+  applicationName: 'Túri Csaba',
+  appleWebApp: {
+    capable: true,
+    title: 'Túri Csaba',
+    statusBarStyle: 'default',
+  },
+  icons: {
+    icon: [
+      {url: '/favicon.ico', sizes: 'any'},
+      {url: '/icons/icon-192.png', type: 'image/png', sizes: '192x192'},
+      {url: '/icons/icon-512.png', type: 'image/png', sizes: '512x512'},
+    ],
+    apple: [{url: '/apple-touch-icon.png', sizes: '180x180'}],
+  },
   openGraph: {
     title: TITLE,
     description: DESCRIPTION,
@@ -52,7 +69,11 @@ export default function RootLayout({children}: Readonly<{children: ReactNode}>) 
   return (
     <html lang="hu" className={inter.variable} data-scroll-behavior="smooth">
       <body className="font-sans">
-        <ContentProvider>{children}</ContentProvider>
+        <ContentProvider>
+          {children}
+          {/* Service worker registration + the install offer. */}
+          <PwaSetup />
+        </ContentProvider>
         {CLOUDFLARE_TOKEN && (
           <script
             defer

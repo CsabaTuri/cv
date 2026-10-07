@@ -130,6 +130,7 @@ See [`.env.example`](./.env.example) for the documented template.
 | `IMAGE_TAG_CV`, `IMAGE_TAG_CHAT_BACKEND`, `IMAGE_TAG_DEPLOYER` | **Required**: one concrete version per image, never `latest`; see *Rollback* below. |
 | `SITE_BIND`, `API_BIND`, `PHPMYADMIN_BIND` | Host interfaces the ports are bound to. |
 | `NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN` | Optional analytics token, baked in at build time. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push key pair and contact. Empty keys simply disable the notifications. |
 | `DEPLOY_ENABLED` | Allows the rebuild helper to act (`false` by default). |
 | `DEPLOY_COMPOSE_FILES` | Compose files the triggered rebuild uses (colon separated). |
 | `DEPLOY_SERVICES` | Services the button rebuilds (default `cv chat-backend`). |
@@ -139,6 +140,48 @@ Compose fails fast when a required value is missing (`${VAR:?}`), so the stack
 can neither start with an empty password nor without a version — see the error
 when running `docker compose config` with an empty `ADMIN_TOKEN`, or with any of
 the image tags left out.
+
+## Installable app and notifications
+
+The site is a PWA: it can be installed from the browser (manifest, icons,
+service worker) and it opens offline, because the service worker caches the
+exported shell and the hashed assets. `/api/*` is never cached, so the chat and
+the admin panel always talk to the live backend.
+
+Notifications are **Web Push**, so they arrive with the site (and the browser)
+closed:
+
+| Audience | Gets a notification when | Switch |
+| --- | --- | --- |
+| Visitor | an admin answers in their chat | the bell in the chat window |
+| Admin | a visitor writes | the *Értesítések* button in the admin panel |
+
+Both switches need a user click (browsers do not allow asking for the
+notification permission any other way), and both are per browser.
+
+The delivery is done by the `chat-backend` service with the VAPID key pair from
+`.env` (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`). Rotating the
+pair invalidates every existing subscription, so each browser has to switch the
+notifications on again. The texts of the notifications are editable on the admin
+page under *Szövegek* → *Értesítések*.
+
+Two things the browser decides, not us:
+
+* Web Push and the service worker only work in a **secure context**: HTTPS, or
+  `localhost`. Over `http://<LAN-IP>:3036` the site works, but notifications and
+  offline mode stay unavailable (the panel says so instead of failing silently).
+* On **iOS** the notifications require the site to be installed first
+  (Share → *Add to Home Screen*), from iOS 16.4 on.
+
+Endpoints (see [chat-backend/README.md](./chat-backend/README.md)):
+
+```bash
+GET    /api/push/public-key      # the VAPID public key + whether push is on
+POST   /api/push/subscriptions   # { audience, sessionId?, subscription }
+DELETE /api/push/subscriptions   # { audience, sessionId?, endpoint }
+GET    /api/admin/push/subscriptions
+POST   /api/admin/push/test      # test notification to the admin's browsers
+```
 
 ## Security measures
 
@@ -229,6 +272,7 @@ schema needs a restore as well.
 
 ## Documentation
 
+* [chat-backend/README.md](./chat-backend/README.md) — the API, including the push endpoints.
 * [cv/README.md](./cv/README.md) — static CV site, pages, build (English).
 * [cv/README.hu.md](./cv/README.hu.md) — ugyanaz magyarul.
 * [chat-backend/README.md](./chat-backend/README.md) — API endpoints, schema (English).

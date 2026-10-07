@@ -210,6 +210,89 @@ export const CONTENT_FIELDS = [
     value: 'A keresett oldal nem létezik, vagy elköltöztették.',
   },
   {key: 'notFound.home', group: '404 oldal', label: 'Vissza a főoldalra gomb', value: 'Vissza a főoldalra'},
+
+  // --- notifications ----------------------------------------------------
+  {
+    key: 'notify.adminTitle',
+    group: 'Értesítések',
+    label: 'Admin értesítés címe (új látogató üzenet)',
+    value: 'Új üzenet a chatban',
+  },
+  {
+    key: 'notify.replyTitle',
+    group: 'Értesítések',
+    label: 'Látogatói értesítés címe (válasz érkezett)',
+    value: 'Válasz érkezett',
+  },
+  {
+    key: 'notify.replyBody',
+    group: 'Értesítések',
+    label: 'Látogatói értesítés szövege (ha a válasz üres)',
+    value: 'Új üzenet a chatben.',
+  },
+  {
+    key: 'notify.testTitle',
+    group: 'Értesítések',
+    label: 'Teszt értesítés címe (admin)',
+    value: 'Teszt értesítés',
+  },
+  {
+    key: 'notify.testBody',
+    group: 'Értesítések',
+    label: 'Teszt értesítés szövege (admin)',
+    value: 'Ha ezt látod, az értesítések működnek.',
+  },
+  {
+    key: 'notify.enable',
+    group: 'Értesítések',
+    label: 'Értesítés bekapcsolása gomb (chat ablak)',
+    value: 'Szólj, ha válaszol',
+  },
+  {
+    key: 'notify.on',
+    group: 'Értesítések',
+    label: 'Bekapcsolt értesítés jelzése',
+    value: 'Értesítés bekapcsolva',
+  },
+  {
+    key: 'notify.off',
+    group: 'Értesítések',
+    label: 'Értesítés kikapcsolása gomb',
+    value: 'Értesítés kikapcsolása',
+  },
+  {
+    key: 'notify.blocked',
+    group: 'Értesítések',
+    label: 'Értesítés: a böngésző blokkolja',
+    value: 'A böngésző blokkolja az értesítéseket.',
+  },
+  {
+    key: 'notify.unsupported',
+    group: 'Értesítések',
+    label: 'Értesítés: nem támogatott',
+    value: 'Ez a böngésző nem támogatja az értesítéseket.',
+  },
+  {
+    key: 'notify.insecure',
+    group: 'Értesítések',
+    label: 'Értesítés: csak HTTPS-en működik',
+    value: 'Az értesítés csak HTTPS-en (vagy localhoston) működik.',
+  },
+  {
+    key: 'notify.failed',
+    group: 'Értesítések',
+    label: 'Értesítés: hibaüzenet',
+    value: 'Nem sikerült bekapcsolni az értesítést.',
+  },
+
+  // --- installable app (PWA) --------------------------------------------
+  {key: 'pwa.install', group: 'Alkalmazás', label: 'Telepítés gomb', value: 'Telepítés'},
+  {
+    key: 'pwa.dismiss',
+    group: 'Alkalmazás',
+    label: 'Telepítési ajánlat bezárása (képernyőolvasó)',
+    value: 'Ajánlat bezárása',
+  },
 ];
 
 /** The value as stored in MySQL: JSON fields are serialised. */

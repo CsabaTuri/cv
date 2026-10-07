@@ -9,7 +9,7 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-COPY --chown=nodejs:nodejs server.js content.js ./
+COPY --chown=nodejs:nodejs server.js content.js push.js ./
 
 ENV NODE_ENV=production
 ENV PORT=3000

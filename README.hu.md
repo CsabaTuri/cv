@@ -129,6 +129,7 @@ A dokumentált sablon: [`.env.example`](./.env.example).
 | `IMAGE_TAG_CV`, `IMAGE_TAG_CHAT_BACKEND`, `IMAGE_TAG_DEPLOYER` | **Kötelező**: image-enként egy konkrét verzió, soha nem `latest`; lásd *Visszaállás*. |
 | `SITE_BIND`, `API_BIND`, `PHPMYADMIN_BIND` | Mely host interfészekre kötődjenek a portok. |
 | `NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN` | Opcionális analytics token, build időben kerül a bundle-be. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push kulcspár és kapcsolat. Üres kulcsokkal az értesítések egyszerűen kikapcsoltak. |
 | `DEPLOY_ENABLED` | Engedélyezi, hogy a rebuild helper cselekedjen (alap: `false`). |
 | `DEPLOY_COMPOSE_FILES` | Mely compose fájlokat használja az indított build (képponttal elválasztva). |
 | `DEPLOY_SERVICES` | Mely szolgáltatásokat építse újra a gomb (alap: `cv chat-backend`). |
@@ -137,6 +138,49 @@ A dokumentált sablon: [`.env.example`](./.env.example).
 A compose **fail-fast**: hiányzó kötelező érték esetén (`${VAR:?}`) nem indul
 el gyenge jelszóval, és verzió nélkül sem — próbáld ki üres `ADMIN_TOKEN`-nel,
 vagy valamelyik image tag nélkül a `docker compose config` paranccsal.
+
+## Telepíthető alkalmazás és értesítések
+
+Az oldal PWA: böngészőből telepíthető (manifest, ikonok, service worker), és
+offline is megnyílik, mert a service worker gyorsítótárazza az exportált héjat
+és a hashelt asset-eket. Az `/api/*` viszont **soha** nem kerül cache-be, így a
+chat és az admin panel mindig az élő backenddel beszél.
+
+Az értesítések **Web Push** értesítések, tehát akkor is megérkeznek, ha az oldal
+(és a böngésző) zárva van:
+
+| Kinek | Mikor szól | Kapcsoló |
+| --- | --- | --- |
+| Látogató | az admin válaszol a chatjében | a csengő ikon a chat ablakban |
+| Admin | látogató ír | az *Értesítések* gomb az admin panelen |
+
+Mindkét kapcsoló kattintást igényel (a böngésző máshogy nem engedi elkérni az
+értesítési engedélyt), és böngészőnként külön él.
+
+A kézbesítést a `chat-backend` végzi a `.env`-ben lévő VAPID kulcspárral
+(`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`). A kulcspár cseréje
+minden meglévő feliratkozást érvénytelenít, ezért minden böngészőben újra be kell
+kapcsolni az értesítéseket. Az értesítések szövegei az admin oldalon a *Szövegek*
+→ *Értesítések* csoportban szerkeszthetők.
+
+Két dolgot a böngésző dönt el, nem mi:
+
+* A Web Push és a service worker csak **biztonságos környezetben** működik:
+  HTTPS-en vagy `localhost`-on. `http://<LAN-IP>:3036` alatt az oldal működik, de
+  az értesítés és az offline mód nem elérhető (a panel ezt ki is írja, nem
+  hallgat el hibát).
+* **iOS-en** az értesítéshez előbb telepíteni kell az oldalt (Megosztás → *Főképernyőhöz adás*),
+  iOS 16.4-től.
+
+Végpontok (lásd [chat-backend/README.hu.md](./chat-backend/README.hu.md)):
+
+```bash
+GET    /api/push/public-key      # a VAPID publikus kulcs + hogy be van-e kapcsolva
+POST   /api/push/subscriptions   # { audience, sessionId?, subscription }
+DELETE /api/push/subscriptions   # { audience, sessionId?, endpoint }
+GET    /api/admin/push/subscriptions
+POST   /api/admin/push/test      # teszt értesítés az admin böngészőinek
+```
 
 ## Biztonsági intézkedések
 
@@ -225,6 +269,7 @@ létre, ezért egy régebbi image egy újabb séma ellen szintén restore-t igé
 
 ## Dokumentáció
 
+* [chat-backend/README.hu.md](./chat-backend/README.hu.md) — az API, benne a push végpontok.
 * [cv/README.md](./cv/README.md) — statikus önéletrajz oldal (angolul).
 * [cv/README.hu.md](./cv/README.hu.md) — statikus önéletrajz oldal magyarul.
 * [chat-backend/README.md](./chat-backend/README.md) — API végpontok, séma (angolul).

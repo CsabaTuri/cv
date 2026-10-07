@@ -4,6 +4,8 @@ import {useEffect, useState} from 'react';
 import ChatInbox from './ChatInbox';
 import ContentEditor from './ContentEditor';
 import DeployPanel from './DeployPanel';
+import {usePush} from './usePush';
+import {Bell, BellOff} from './icons';
 
 const TOKEN_KEY = 'cv-chat-admin-token';
 
@@ -12,6 +14,24 @@ export default function AdminChat() {
   const [ready, setReady] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
   const [tab, setTab] = useState<'inbox' | 'content' | 'build'>('inbox');
+
+  // Notifications for this browser: the backend pushes whenever a visitor
+  // writes, so they arrive with the panel (and the browser) closed.
+  const push = usePush({
+    audience: 'admin',
+    token,
+    labels: {
+      enable: 'Értesítések bekapcsolása',
+      on: 'Értesítések bekapcsolva',
+      off: 'Értesítések kikapcsolása',
+      blocked: 'A böngésző blokkolja az értesítéseket.',
+      unsupported: 'Ez a böngésző nem támogatja az értesítéseket.',
+      insecure: 'Az értesítés csak HTTPS-en (vagy localhoston) működik.',
+      failed: 'Nem sikerült az értesítés művelet.',
+      sent: (sent, failed) =>
+        failed ? `Elküldve: ${sent}, hiba: ${failed}` : `Elküldve: ${sent}`,
+    },
+  });
   const [error, setError] = useState<string | null>(null);
 
   // The stored token is only available in the browser, so the login form is
@@ -116,18 +136,55 @@ export default function AdminChat() {
             </button>
           </nav>
 
-          <button
-            type="button"
-            onClick={signOut}
-            className="rounded-full border border-gray-300 px-4 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-900"
-          >
-            Kilépés
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void push.toggle()}
+              disabled={push.disabled}
+              aria-pressed={push.state === 'on'}
+              title={push.label}
+              className={
+                push.state === 'on'
+                  ? 'inline-flex items-center gap-1.5 rounded-full bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-500 disabled:opacity-50'
+                  : 'inline-flex items-center gap-1.5 rounded-full border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-900 disabled:opacity-50'
+              }
+            >
+              {push.state === 'on' ? (
+                <Bell className="h-3.5 w-3.5" />
+              ) : (
+                <BellOff className="h-3.5 w-3.5" />
+              )}
+              {push.state === 'on' ? 'Értesítés bekapcsolva' : 'Értesítések'}
+            </button>
+
+            {push.canTest && (
+              <button
+                type="button"
+                onClick={() => void push.test()}
+                disabled={push.busy}
+                className="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-900 disabled:opacity-50"
+              >
+                Teszt
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={signOut}
+              className="rounded-full border border-gray-300 px-4 py-1.5 text-xs font-semibold text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-900"
+            >
+              Kilépés
+            </button>
+          </div>
         </div>
       </header>
 
       {error && (
         <p className="mx-auto max-w-7xl px-6 pt-4 text-sm text-red-600">{error}</p>
+      )}
+
+      {push.message && (
+        <p className="mx-auto max-w-7xl px-6 pt-4 text-sm text-gray-600">{push.message}</p>
       )}
 
       {tab === 'inbox' && <ChatInbox token={token} onUnauthorized={handleUnauthorized} />}

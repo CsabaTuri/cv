@@ -26,16 +26,39 @@
 //     -> { ok, messages: [...], cursor }
 //   POST /api/admin/conversations/:id/reply   { message }
 //     -> { ok, message: { id, role, body, createdAt } }
+//   GET  /api/admin/push/subscriptions
+//     -> { ok, enabled, subscriptions, visitorCount }
+//   POST /api/admin/push/test          -> sends a test notification to admins
+//
+// Push notifications (Web Push, works with the site closed):
+//   GET    /api/push/public-key       -> { ok, enabled, key }
+//   POST   /api/push/subscriptions    { audience, sessionId?, subscription }
+//   DELETE /api/push/subscriptions    { audience, sessionId?, endpoint }
+//   `audience: 'visitor'` needs a sessionId, `audience: 'admin'` needs the
+//   admin token. A visitor is notified when an answer arrives, the admin when a
+//   visitor writes.
 //
 // Environment:
 //   DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD   MySQL connection
 //   ADMIN_TOKEN                                      guards /api/admin/*
+//   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT  Web Push (optional)
 //   PORT                                             default 3000
 
 import {randomUUID, timingSafeEqual} from 'node:crypto';
 import express from 'express';
 import mysql from 'mysql2/promise';
 import {CONTENT_FIELDS, storedValue} from './content.js';
+import {
+  deleteSubscription,
+  listSubscriptions,
+  notifyAdmins,
+  notifyAdminsTest,
+  notifyVisitor,
+  pushConfigured,
+  readSubscription,
+  saveSubscription,
+  vapidPublicKey,
+} from './push.js';
 
 const app = express();
 app.use(express.json({limit: '32kb'}));
@@ -79,6 +102,20 @@ const SCHEMA = [
      INDEX idx_conversation (conversation_id, id),
      CONSTRAINT fk_messages_conversation FOREIGN KEY (conversation_id)
        REFERENCES conversations(id) ON DELETE CASCADE
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+  `CREATE TABLE IF NOT EXISTS push_subscriptions (
+     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     endpoint VARCHAR(512) NOT NULL,
+     p256dh VARCHAR(128) NOT NULL,
+     auth VARCHAR(128) NOT NULL,
+     audience ENUM('admin','visitor') NOT NULL,
+     conversation_id CHAR(36) NULL,
+     user_agent VARCHAR(255) NULL,
+     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     last_success_at TIMESTAMP NULL,
+     last_error_at TIMESTAMP NULL,
+     UNIQUE KEY uniq_endpoint_audience (endpoint(255), audience),
+     INDEX idx_audience_conversation (audience, conversation_id)
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
   `CREATE TABLE IF NOT EXISTS site_content (
      \`key\` VARCHAR(64) NOT NULL PRIMARY KEY,
@@ -181,6 +218,48 @@ async function insertMessage(conversationId, role, body) {
   return toMessage(rows[0]);
 }
 
+// The copy of the notifications is editable on the admin page like every other
+// text; these defaults are only used before the first seeding.
+const PUSH_TEXT_DEFAULTS = {
+  adminTitle: 'Új üzenet a chatban',
+  replyTitle: 'Válasz érkezett',
+  replyBody: 'Új üzenet a chatban.',
+  testTitle: 'Teszt értesítés',
+  testBody: 'Ha ezt látod, az értesítések működnek.',
+};
+
+const PUSH_TEXT_KEYS = [
+  'notify.adminTitle',
+  'notify.replyTitle',
+  'notify.replyBody',
+  'notify.testTitle',
+  'notify.testBody',
+];
+
+async function pushTexts() {
+  try {
+    const [rows] = await pool.query('SELECT `key`, value FROM site_content WHERE `key` IN (?)', [
+      PUSH_TEXT_KEYS,
+    ]);
+    const stored = Object.fromEntries(rows.map((row) => [row.key, String(row.value).trim()]));
+
+    return {
+      adminTitle: stored['notify.adminTitle'] || PUSH_TEXT_DEFAULTS.adminTitle,
+      replyTitle: stored['notify.replyTitle'] || PUSH_TEXT_DEFAULTS.replyTitle,
+      replyBody: stored['notify.replyBody'] || PUSH_TEXT_DEFAULTS.replyBody,
+      testTitle: stored['notify.testTitle'] || PUSH_TEXT_DEFAULTS.testTitle,
+      testBody: stored['notify.testBody'] || PUSH_TEXT_DEFAULTS.testBody,
+    };
+  } catch (error) {
+    console.error('[push] could not read the notification texts:', error.message);
+    return {...PUSH_TEXT_DEFAULTS};
+  }
+}
+
+function sendInBackground(work, label) {
+  void work.catch((error) => console.error(`[push] ${label} failed:`, error?.message ?? error));
+}
+
 async function ensureConversation(sessionId, req) {
   const [rows] = await pool.query('SELECT id FROM conversations WHERE id = ?', [sessionId]);
   if (rows.length) return sessionId;
@@ -236,6 +315,12 @@ app.post('/api/chat', async (req, res) => {
   try {
     await ensureConversation(sessionId, req);
     const stored = await insertMessage(sessionId, 'visitor', message);
+
+    sendInBackground(
+      pushTexts().then((texts) => notifyAdmins(pool, {conversationId: sessionId, message, texts})),
+      'admin notification',
+    );
+
     return res.status(201).json({ok: true, sessionId, message: stored});
   } catch (dbError) {
     console.error('[chat] failed to store message:', dbError);
@@ -265,6 +350,67 @@ app.get('/api/chat/messages', async (req, res) => {
   } catch (dbError) {
     console.error('[chat] failed to read messages:', dbError);
     return res.status(500).json({ok: false, error: 'Could not read messages'});
+  }
+});
+
+// --- Push notifications ----------------------------------------------------
+
+app.get('/api/push/public-key', (_req, res) => {
+  res.json({ok: true, enabled: pushConfigured(), key: vapidPublicKey()});
+});
+
+// One endpoint for both sides: the audience decides which credential it needs.
+function readAudience(req) {
+  const audience = req.body?.audience;
+  if (audience !== 'admin' && audience !== 'visitor') return {error: 'Unknown audience'};
+
+  if (audience === 'admin') {
+    if (!isAdmin(req)) return {unauthorized: true};
+    return {audience, conversationId: null};
+  }
+
+  const sessionId = req.body?.sessionId;
+  if (!isUuidLike(sessionId)) return {error: 'Missing sessionId'};
+  return {audience, conversationId: sessionId};
+}
+
+app.post('/api/push/subscriptions', async (req, res) => {
+  const {audience, conversationId, error, unauthorized} = readAudience(req);
+  if (unauthorized) return res.status(401).json({ok: false, error: 'Unauthorized'});
+  if (error) return res.status(400).json({ok: false, error});
+  if (!pushConfigured()) return res.status(503).json({ok: false, error: 'Push is not configured'});
+
+  const subscription = readSubscription(req.body);
+  if (!subscription) return res.status(400).json({ok: false, error: 'Invalid subscription'});
+
+  try {
+    await saveSubscription(pool, {
+      audience,
+      conversationId,
+      subscription,
+      userAgent: req.body?.userAgent ?? req.get('user-agent'),
+    });
+    return res.status(201).json({ok: true});
+  } catch (dbError) {
+    console.error('[push] failed to store the subscription:', dbError);
+    return res.status(500).json({ok: false, error: 'Could not store subscription'});
+  }
+});
+
+app.delete('/api/push/subscriptions', async (req, res) => {
+  const {audience, conversationId, error, unauthorized} = readAudience(req);
+  if (unauthorized) return res.status(401).json({ok: false, error: 'Unauthorized'});
+  if (error) return res.status(400).json({ok: false, error});
+
+  const endpoint = typeof req.body?.endpoint === 'string' ? req.body.endpoint : '';
+  if (!endpoint) return res.status(400).json({ok: false, error: 'Missing endpoint'});
+
+  try {
+    const removed = await deleteSubscription(pool, {audience, conversationId, endpoint});
+    return res.json({ok: true, removed});
+  } catch (dbError) {
+    console.error('[push] failed to remove the subscription:', dbError);
+    return res.status(500).json({ok: false, error: 'Could not remove subscription'});
   }
 });
 
@@ -352,6 +498,14 @@ app.post('/api/admin/conversations/:id/reply', requireAdmin, async (req, res) =>
     if (!rows.length) return res.status(404).json({ok: false, error: 'Unknown conversation'});
 
     const stored = await insertMessage(req.params.id, 'admin', message);
+
+    sendInBackground(
+      pushTexts().then((texts) =>
+        notifyVisitor(pool, {conversationId: req.params.id, message, texts}),
+      ),
+      'visitor notification',
+    );
+
     return res.status(201).json({ok: true, message: stored});
   } catch (dbError) {
     console.error('[chat] failed to store reply:', dbError);
@@ -432,6 +586,36 @@ app.put('/api/admin/content', requireAdmin, async (req, res) => {
   } catch (dbError) {
     console.error('[chat] failed to save the content:', dbError);
     return res.status(500).json({ok: false, error: 'Could not save the content'});
+  }
+});
+
+app.get('/api/admin/push/subscriptions', requireAdmin, async (_req, res) => {
+  try {
+    const [admins, visitors] = await Promise.all([
+      listSubscriptions(pool, 'admin'),
+      listSubscriptions(pool, 'visitor'),
+    ]);
+    return res.json({
+      ok: true,
+      enabled: pushConfigured(),
+      subscriptions: admins,
+      visitorCount: visitors.length,
+    });
+  } catch (dbError) {
+    console.error('[push] failed to list the subscriptions:', dbError);
+    return res.status(500).json({ok: false, error: 'Could not list subscriptions'});
+  }
+});
+
+app.post('/api/admin/push/test', requireAdmin, async (_req, res) => {
+  if (!pushConfigured()) return res.status(503).json({ok: false, error: 'Push is not configured'});
+
+  try {
+    const result = await notifyAdminsTest(pool, {texts: await pushTexts()});
+    return res.json({ok: true, ...result});
+  } catch (error) {
+    console.error('[push] test notification failed:', error);
+    return res.status(500).json({ok: false, error: 'Could not send the test notification'});
   }
 });
 

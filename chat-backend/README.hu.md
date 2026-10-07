@@ -25,6 +25,11 @@ panel nyitva van, 3 másodpercenként polloz.
 | `GET` | `/api/admin/conversations` | Inbox lista olvasatlan darabszámmal és az utolsó üzenettel. |
 | `GET` | `/api/admin/conversations/:id/messages?afterId=` | Egy beszélgetés teljes szála. |
 | `POST` | `/api/admin/conversations/:id/reply` | `{ message }` → `admin` üzenetként mentve. |
+| `GET` | `/api/push/public-key` | `{ ok, enabled, key }` — a böngészői feliratkozáshoz tartozó VAPID publikus kulcs. |
+| `POST` | `/api/push/subscriptions` | `{ audience, sessionId?, subscription, userAgent? }` → `201`. `visitor` esetén `sessionId` kell, `admin` esetén az admin token. |
+| `DELETE` | `/api/push/subscriptions` | `{ audience, sessionId?, endpoint }` → `{ ok, removed }`. |
+| `GET` | `/api/admin/push/subscriptions` | Admin feliratkozások (csonkolt endpointok) + a látogatói darabszám. |
+| `POST` | `/api/admin/push/test` | `{ ok, sent, failed }` — teszt értesítés az admin böngészőinek. |
 
 Minden `/api/admin/*` kéréshez kell `Authorization: Bearer <ADMIN_TOKEN>` (a
 `/admin` oldal egyszer bekéri a tokent, és a `localStorage`-ban tárolja).
@@ -58,14 +63,34 @@ szerkesztéseit soha nem írja felül; a katalógusból kikerült sorokat törli
 | --- | --- |
 | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | MySQL kapcsolat. |
 | `ADMIN_TOKEN` | Az `/api/admin/*` végpontokat védi. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push kulcspár (opcionális: nélküle az értesítések kikapcsoltak). |
 | `PORT` | Figyelt port (alapértelmezés: `3000`). |
+
+## Push értesítések
+
+Web Push, tehát zárt oldal mellett is megérkezik az értesítés. A feliratkozások a
+`push_subscriptions` táblában vannak (endpoint, `p256dh`, `auth`, audience,
+beszélgetés, user-agent, kézbesítési időbélyegek), a küldést a `web-push` végzi:
+
+* egy **látogatói** üzenet minden `admin` feliratkozást értesít;
+* egy **admin** válasz az adott beszélgetés `visitor` feliratkozásait értesíti.
+
+A payload `{ title, body, url, tag }`; a cím az oldal szövegeiből jön (`notify.*`
+kulcsok, az admin oldalon szerkeszthetők), a törzs a csonkolt üzenet. A küldés
+fire-and-forget: egy push hiba soha nem buktatja el az API hívást. A push
+szolgáltatás `404`/`410` válasza azt jelenti, hogy a böngésző eldobta a
+feliratkozást, ezért a sor törlődik; más hiba csak a `last_error_at`-ot állítja.
+
+Ha a `VAPID_*` változók hiányoznak a környezetből, a funkció kikapcsolva marad és
+a feliratkozási végpontok `503`-at adnak.
 
 ## Adatbázis
 
 `conversations` (id, időbélyegek, látogató ip/user-agent), `messages`
-(id, conversation_id, `role` = `visitor`/`admin`, body, created_at) és
-`site_content` (key, value, updated_at). A táblák induláskor automatikusan
-létrejönnek; minden időbélyeg UTC-ben értendő.
+(id, conversation_id, `role` = `visitor`/`admin`, body, created_at),
+`site_content` (key, value, updated_at) és `push_subscriptions` (endpoint,
+kulcsok, audience, beszélgetés, user-agent, kézbesítési időbélyegek). A táblák
+induláskor automatikusan létrejönnek; minden időbélyeg UTC-ben értendő.
 
 ## Helyi fejlesztés
 

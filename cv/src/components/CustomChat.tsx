@@ -2,13 +2,26 @@
 
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {useText} from './ContentProvider';
-import {MessageCircle, Send, X} from './icons';
+import {usePush} from './usePush';
+import {Bell, BellOff, MessageCircle, Send, X} from './icons';
 
 // Same-origin: nginx proxies /api/ to the chat-backend service (see nginx.conf).
 const API_BASE = '/api/chat';
 const SESSION_KEY = 'cv-chat-session';
 const POLL_INTERVAL_MS = 3000;
 const MAX_MESSAGE_LENGTH = 4000;
+
+// `crypto.randomUUID` only exists in a secure context, and the site is also
+// reachable over plain http on the LAN - the backend accepts the same shape.
+function createSessionId(): string {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+
+  const bytes = window.crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 type ChatMessage = {
   id: number;
@@ -28,7 +41,16 @@ export default function CustomChat() {
   const openLabel = useText('chat.openLabel');
   const closeLabel = useText('chat.closeLabel');
 
+  const notifyEnable = useText('notify.enable');
+  const notifyOn = useText('notify.on');
+  const notifyOff = useText('notify.off');
+  const notifyBlocked = useText('notify.blocked');
+  const notifyUnsupported = useText('notify.unsupported');
+  const notifyInsecure = useText('notify.insecure');
+  const notifyFailed = useText('notify.failed');
+
   const [open, setOpen] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -39,9 +61,32 @@ export default function CustomChat() {
   const cursor = useRef(0);
   const log = useRef<HTMLDivElement>(null);
 
+  // The id is created before the first message so the notification
+  // subscription can be tied to the same conversation.
   useEffect(() => {
-    session.current = window.localStorage.getItem(SESSION_KEY);
+    let id = window.localStorage.getItem(SESSION_KEY);
+    if (!id) {
+      id = createSessionId();
+      window.localStorage.setItem(SESSION_KEY, id);
+    }
+
+    session.current = id;
+    setSessionId(id);
   }, []);
+
+  const push = usePush({
+    audience: 'visitor',
+    sessionId,
+    labels: {
+      enable: notifyEnable,
+      on: notifyOn,
+      off: notifyOff,
+      blocked: notifyBlocked,
+      unsupported: notifyUnsupported,
+      insecure: notifyInsecure,
+      failed: notifyFailed,
+    },
+  });
 
   // Pulls everything that arrived since the last poll (own messages included,
   // they are deduplicated by the cursor).
@@ -146,15 +191,36 @@ export default function CustomChat() {
               <p className="text-xs text-gray-500">
                 {subtitle}
               </p>
+              {push.state === 'on' && (
+                <p className="text-xs text-emerald-600">{notifyOn}</p>
+              )}
+              {push.message && <p className="text-xs text-amber-700">{push.message}</p>}
             </div>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label={closeLabel}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => void push.toggle()}
+                disabled={push.disabled}
+                aria-pressed={push.state === 'on'}
+                aria-label={push.label}
+                title={push.label}
+                className={
+                  push.state === 'on'
+                    ? 'inline-flex h-8 w-8 items-center justify-center rounded-full text-indigo-600 transition-colors hover:bg-indigo-50 disabled:opacity-50'
+                    : 'inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50'
+                }
+              >
+                {push.state === 'on' ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label={closeLabel}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </header>
 
           <div ref={log} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
