@@ -233,10 +233,107 @@ services:
       # non-internal network; this one carries nothing but that published port.
       - pma
 
+  # ---------------------------------------------------------------------------
+  # deployer - the admin panel's one-click rebuild button. Opt-in: it only
+  # starts with the `deploy` profile and only acts when DEPLOY_ENABLED=true.
+  #
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+  #     --profile deploy up -d
+  #
+  # It is the single container with access to the Docker socket, which is
+  # root-equivalent on the host, so nothing else mounts it and the helper can
+  # only ever run one hardcoded command (no shell, no free-form input):
+  #
+  #   docker compose up -d --build cv chat-backend
+  #
+  # That command deliberately does not include `deployer` itself, so the helper
+  # survives the rebuild it triggers and can stream the build log to the panel.
+  # ---------------------------------------------------------------------------
+  deployer:
+    build:
+      context: ./deployer
+      dockerfile: Dockerfile
+    image: cv-deployer:latest
+    container_name: cv_deployer
+    restart: unless-stopped
+    profiles:
+      - deploy
+    depends_on:
+      chat-backend:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      DEPLOY_ENABLED: ${DEPLOY_ENABLED:-false}
+      DEPLOY_SERVICES: ${DEPLOY_SERVICES:-cv chat-backend}
+      DEPLOY_TIMEOUT_MS: ${DEPLOY_TIMEOUT_MS:-900000}
+      PROJECT_DIR: /workspace
+      STATE_DIR: /state
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?ADMIN_TOKEN is missing from .env}
+      # Which compose files the triggered build uses (colon separated, exactly
+      # like COMPOSE_FILE). The dev stack needs
+      # "docker-compose.yml:docker-compose.override.yml" here.
+      COMPOSE_FILE: ${DEPLOY_COMPOSE_FILES:-docker-compose.yml:docker-compose.prod.yml}
+      COMPOSE_PROFILES: deploy
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-cv}
+      DOCKER_CONFIG: /tmp/docker-config
+      HOME: /tmp
+      # Values compose interpolates for the nested run. The triggered deploy
+      # does not read the repo .env (this container is not allowed to: the file
+      # is 0600 and the helper has the Docker socket, so it cannot be given
+      # host secrets), which means every variable the compose files interpolate
+      # has to be listed here too. When .env grows a new one, add it below.
+      TZ: ${TZ:-Europe/Budapest}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE is missing from .env}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER is missing from .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is missing from .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is missing from .env}
+      SITE_BIND: ${SITE_BIND:-0.0.0.0}
+      API_BIND: ${API_BIND:-127.0.0.1}
+      PHPMYADMIN_BIND: ${PHPMYADMIN_BIND:-127.0.0.1}
+      NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN: ${NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN:-}
+    volumes:
+      # The socket is host-root equivalent: this container is privileged by
+      # nature, which is why it is kept minimal, opt-in and single-purpose.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Read-only source tree: the build contexts and the compose files.
+      - ${DEPLOY_SOURCE_DIR:-.}:/workspace:ro
+      # Last build result, so the panel still shows it after a helper restart.
+      - deploy-state:/state
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    init: true
+    # A rebuild can take minutes: give it time to finish instead of killing the
+    # helper (and the build) on the first stop.
+    stop_grace_period: 10m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/api/deploy/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 384M
+          pids: 256
+    logging: *logging
+    networks:
+      - app
+
 volumes:
   # Default naming (cv_mysql-data) on purpose: this is the volume the stack
   # already uses, keeping the existing data.
   mysql-data:
+
+  # Last build state of the deployer helper.
+  deploy-state:
 
 networks:
   # Application tier (site <-> API) and the network the stack publishes from.

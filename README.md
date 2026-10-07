@@ -22,12 +22,16 @@ browser ──▶ cv (nginx-unprivileged, uid 101)
 | `chat-backend` | `cv-chat-backend:latest` (Node 20, user `nodejs`) | `3112:3000` | `app`, `data` | Chat + admin API. Read-only rootfs, all capabilities dropped. |
 | `mysql` | `mysql:8.4` | none | `data` (internal) | Messages, conversations, site copy. |
 | `phpmyadmin` | `phpmyadmin:5-apache` | `8081:80` | `data`, `pma` | Database UI for the operator. |
+| `deployer` | `cv-deployer:latest` (Node 20 + Docker CLI) | none | `app` | Opt-in rebuild helper (compose profile `deploy`). Holds the Docker socket; see [One-click rebuild](#one-click-rebuild-admin-panel). |
 
 `data` is `internal: true`: MySQL has no internet egress and cannot be reached
 from the host or the LAN. `pma` carries nothing but phpMyAdmin's published port
 (Docker cannot publish a port of a container attached only to internal
 networks). The `app` subnet (`172.31.255.0/24`) is kept fixed on purpose — the
 host routes it.
+
+The `deployer` helper only starts with the `deploy` profile and publishes
+nothing: it is the single service with access to the Docker socket.
 
 ## Compose files
 
@@ -43,6 +47,9 @@ docker compose up -d --build
 
 # production (base + prod, no dev overlay)
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+# production + the optional rebuild helper behind the admin panel's button
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d
 ```
 
 The production overlay pins the admin API and phpMyAdmin to the host loopback
@@ -64,7 +71,7 @@ curl -I http://127.0.0.1:3036/healthz
 | URL | What |
 | --- | --- |
 | http://localhost:3036/ | the site |
-| http://localhost:3036/admin/ | admin panel (*Üzenetek* / *Szövegek*) — asks for `ADMIN_TOKEN` |
+| http://localhost:3036/admin/ | admin panel (*Üzenetek* / *Szövegek* / *Build*) — asks for `ADMIN_TOKEN` |
 | http://localhost:8081/ | phpMyAdmin (loopback only in production) |
 
 For a LAN or remote phpMyAdmin, prefer a tunnel over publishing the port:
@@ -72,6 +79,44 @@ For a LAN or remote phpMyAdmin, prefer a tunnel over publishing the port:
 ```bash
 ssh -L 8081:127.0.0.1:8081 user@host    # then open http://localhost:8081
 ```
+
+## One-click rebuild (admin panel)
+
+The *Build* tab rebuilds and restarts the two images built from this repository
+(`cv`, `chat-backend`) with one button — handy when you edit the code from a
+phone or another machine. Content changes do **not** need it: the site copy
+lives in the database and is edited in the *Szövegek* tab without a rebuild.
+
+The helper is opt-in, because it is the one container with access to the Docker
+socket (root-equivalent on the host):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d
+```
+
+| | |
+| --- | --- |
+| Service | `deployer`, container `cv_deployer`, no published port |
+| Command it runs | `docker compose up -d --build cv chat-backend` (hardcoded, never a shell) |
+| Auth | `Authorization: Bearer $ADMIN_TOKEN` on every endpoint except `/health` |
+| Switches | starts only with the `deploy` profile, acts only when `DEPLOY_ENABLED=true` |
+| Concurrency | one build at a time (a second request gets `409`) |
+| Output | the last 500 log lines in the *Build* tab, kept in the `deploy-state` volume |
+| Timeout | `DEPLOY_TIMEOUT_MS`, 15 minutes by default |
+
+The helper deliberately survives the rebuild it triggers, so the panel can still
+stream the log and show the result; if it is not running, the panel says so and
+prints the command above.
+
+Two things to keep in mind:
+
+* the triggered run does **not** read the repository `.env`. The helper gets
+  every interpolated value through its own environment, so when you add a new
+  variable to `.env` that the compose files use, add it to the `deployer`
+  service as well.
+* `DEPLOY_COMPOSE_FILES` decides which compose files the triggered rebuild uses
+  (default `docker-compose.yml:docker-compose.prod.yml`; the dev overlay sets
+  `docker-compose.yml:docker-compose.override.yml`).
 
 ## Environment (`.env`)
 
@@ -84,6 +129,10 @@ See [`.env.example`](./.env.example) for the documented template.
 | `TZ` | Time zone for MySQL/phpMyAdmin. |
 | `SITE_BIND`, `API_BIND`, `PHPMYADMIN_BIND` | Host interfaces the ports are bound to. |
 | `NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN` | Optional analytics token, baked in at build time. |
+| `DEPLOY_ENABLED` | Allows the rebuild helper to act (`false` by default). |
+| `DEPLOY_COMPOSE_FILES` | Compose files the triggered rebuild uses (colon separated). |
+| `DEPLOY_SERVICES` | Services the button rebuilds (default `cv chat-backend`). |
+| `DEPLOY_SOURCE_DIR` | Source tree the helper mounts (default: the stack directory). |
 
 Compose fails fast when a required value is missing (`${VAR:?}`), so the stack
 can never start with an empty password — see the error when running
@@ -100,6 +149,10 @@ can never start with an empty password — see the error when running
 * Non-root runtime users (uid 101 / `nodejs`), `init: true` for signal handling.
 * Admin API and database UI bound to the host loopback interface in production;
   only the site is public.
+* The rebuild helper is the only container with the Docker socket: opt-in
+  profile, `DEPLOY_ENABLED` switch, one hardcoded command, `ADMIN_TOKEN` on
+  every call, read-only source mount, no published port, all capabilities
+  dropped and no way to read the repository `.env`.
 * nginx: server tokens off, security headers, API rate limiting (20 r/s per IP,
   burst 40 → 429), 16 kB API body limit, method allow-list (405), `X-Powered-By`
   hidden, request timeouts capped.

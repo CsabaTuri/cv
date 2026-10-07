@@ -3,6 +3,7 @@
 import {useEffect, useState} from 'react';
 import ChatInbox from './ChatInbox';
 import ContentEditor from './ContentEditor';
+import DeployPanel from './DeployPanel';
 
 const TOKEN_KEY = 'cv-chat-admin-token';
 
@@ -10,7 +11,7 @@ export default function AdminChat() {
   const [token, setToken] = useState('');
   const [ready, setReady] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
-  const [tab, setTab] = useState<'inbox' | 'content'>('inbox');
+  const [tab, setTab] = useState<'inbox' | 'content' | 'build'>('inbox');
   const [error, setError] = useState<string | null>(null);
 
   // The stored token is only available in the browser, so the login form is
@@ -83,7 +84,7 @@ export default function AdminChat() {
     );
   }
 
-  const tabClass = (name: 'inbox' | 'content') =>
+  const tabClass = (name: 'inbox' | 'content' | 'build') =>
     `rounded-full px-4 py-1.5 text-xs font-semibold transition-colors ${
       tab === name
         ? 'bg-indigo-600 text-white'
@@ -110,6 +111,9 @@ export default function AdminChat() {
             >
               Szövegek
             </button>
+            <button type="button" onClick={() => setTab('build')} className={tabClass('build')}>
+              Build
+            </button>
           </nav>
 
           <button
@@ -126,11 +130,9 @@ export default function AdminChat() {
         <p className="mx-auto max-w-7xl px-6 pt-4 text-sm text-red-600">{error}</p>
       )}
 
-      {tab === 'inbox' ? (
-        <ChatInbox token={token} onUnauthorized={handleUnauthorized} />
-      ) : (
-        <ContentEditor token={token} onUnauthorized={handleUnauthorized} />
-      )}
+      {tab === 'inbox' && <ChatInbox token={token} onUnauthorized={handleUnauthorized} />}
+      {tab === 'content' && <ContentEditor token={token} onUnauthorized={handleUnauthorized} />}
+      {tab === 'build' && <DeployPanel token={token} onUnauthorized={handleUnauthorized} />}
     </main>
   );
 }

@@ -9,6 +9,11 @@
 #   * shorter log rotation with compression, longer shutdown grace periods and
 #     explicit open-file limits
 #
+# The optional rebuild helper is started by adding its profile:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+#     --profile deploy up -d
+#
 # Do not combine it with docker-compose.override.yml (that is the dev overlay).
 # =============================================================================
 
@@ -59,6 +64,22 @@ services:
       # Database UI: loopback only, whatever .env says.
       - "127.0.0.1:8081:80"
     stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+        compress: "true"
+
+  deployer:
+    # Publishes nothing: the helper is reachable only through nginx on the
+    # internal network, and only with ADMIN_TOKEN.
+    read_only: true
+    stop_grace_period: 10m
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 8192
     logging:
       driver: json-file
       options:

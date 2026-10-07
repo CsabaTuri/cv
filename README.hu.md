@@ -22,12 +22,16 @@ böngésző ──▶ cv (nginx-unprivileged, uid 101)
 | `chat-backend` | `cv-chat-backend:latest` (Node 20, `nodejs` user) | `3112:3000` | `app`, `data` | Chat + admin API. Read-only rootfs, minden capability eldobva. |
 | `mysql` | `mysql:8.4` | nincs | `data` (internal) | Üzenetek, beszélgetések, oldal-szövegek. |
 | `phpmyadmin` | `phpmyadmin:5-apache` | `8081:80` | `data`, `pma` | Adatbázis UI az üzemeltetőnek. |
+| `deployer` | `cv-deployer:latest` (Node 20 + Docker CLI) | nincs | `app` | Opcionális rebuild helper (compose profile: `deploy`). Övé a Docker socket; lásd [Újrabuildelés](#újrabuildelés-egy-gombnyomásra-admin-panel). |
 
 A `data` hálózat `internal: true`: a MySQL-nek nincs internet-egress-e, és a
 hostról/LAN-ról sem érhető el. A `pma` hálózat csak a phpMyAdmin publikált
 portját szolgálja (a Docker nem tud portot publikálni olyan konténeren, ami
 csak internal hálózaton van). Az `app` alhálózata (`172.31.255.0/24`)
 szándékosan fix — a host routolja.
+
+A `deployer` helper csak a `deploy` profile-lal indul, és semmit nem publikál:
+ez az egyetlen szolgáltatás, ami a Docker sockethez hozzáfér.
 
 ## Compose fájlok
 
@@ -43,6 +47,9 @@ docker compose up -d --build
 
 # éles (base + prod, dev override nélkül)
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+# éles + az opcionális rebuild helper, ami az admin panel gombja mögött van
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d
 ```
 
 Az éles overlay az admin API-t és a phpMyAdmin-t a host loopback interfészére
@@ -63,7 +70,7 @@ curl -I http://127.0.0.1:3036/healthz
 | URL | Mi |
 | --- | --- |
 | http://localhost:3036/ | a weboldal |
-| http://localhost:3036/admin/ | admin panel (*Üzenetek* / *Szövegek*) — `ADMIN_TOKEN` kell hozzá |
+| http://localhost:3036/admin/ | admin panel (*Üzenetek* / *Szövegek* / *Build*) — `ADMIN_TOKEN` kell hozzá |
 | http://localhost:8081/ | phpMyAdmin (élesben csak loopback) |
 
 LAN-ról vagy távolról a phpMyAdminhoz inkább alagutat használj, ne portot nyiss:
@@ -71,6 +78,44 @@ LAN-ról vagy távolról a phpMyAdminhoz inkább alagutat használj, ne portot n
 ```bash
 ssh -L 8081:127.0.0.1:8081 user@host    # majd http://localhost:8081
 ```
+
+## Újrabuildelés egy gombnyomásra (admin panel)
+
+A *Build* fül egy gombnyomásra újraépíti és újraindítja a repositoryból épülő
+két image-et (`cv`, `chat-backend`) — kényelmes, ha telefonról vagy másik
+gépről nyúlsz a kódhoz. Tartalomhoz **nem** kell: az oldal szövegei az
+adatbázisban élnek, és a *Szövegek* fülön build nélkül szerkeszthetők.
+
+A helper opt-in, mert ez az egyetlen konténer, ami a Docker sockethez nyúl (ez
+a hoston root-joggal egyenértékű):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d
+```
+
+| | |
+| --- | --- |
+| Szolgáltatás | `deployer`, konténer: `cv_deployer`, publikált port nélkül |
+| Amit futtat | `docker compose up -d --build cv chat-backend` (fixen beégetve, shell nélkül) |
+| Auth | `Authorization: Bearer $ADMIN_TOKEN` minden végponton, kivéve a `/health`-et |
+| Kapcsolók | csak a `deploy` profile-lal indul, és csak `DEPLOY_ENABLED=true` esetén cselekszik |
+| Párhuzamosság | egyszerre egy build fut (a második kérés `409`-et kap) |
+| Kimenet | az utolsó 500 naplósor a *Build* fülön, a `deploy-state` volume-ban tárolva |
+| Timeout | `DEPLOY_TIMEOUT_MS`, alapból 15 perc |
+
+A helper szándékosan túléli az általa indított buildet, így a panel közben
+folyamatosan tudja mutatni a naplót és a végét. Ha nem fut, a panel jelzi, és
+kiírja a fenti parancsot.
+
+Két dolog, amit érdemes észben tartani:
+
+* az indított build **nem** olvassa a repository `.env` fájlját (a helper nem is
+  kaphatja meg: 0600, és a Docker socket mellett ez nem fér bele). Minden
+  interpolált értéket a saját környezetéből kap, ezért ha új változót veszel fel
+  a `.env`-be a compose fájlokhoz, a `deployer` szolgáltatásnál is add meg.
+* a `DEPLOY_COMPOSE_FILES` dönti el, mely compose fájlokat használja az
+  indított build (alap: `docker-compose.yml:docker-compose.prod.yml`; a dev
+  overlay `docker-compose.yml:docker-compose.override.yml`-ra állítja).
 
 ## Környezeti változók (`.env`)
 
@@ -83,6 +128,10 @@ A dokumentált sablon: [`.env.example`](./.env.example).
 | `TZ` | Időzóna a MySQL/phpMyAdmin számára. |
 | `SITE_BIND`, `API_BIND`, `PHPMYADMIN_BIND` | Mely host interfészekre kötődjenek a portok. |
 | `NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN` | Opcionális analytics token, build időben kerül a bundle-be. |
+| `DEPLOY_ENABLED` | Engedélyezi, hogy a rebuild helper cselekedjen (alap: `false`). |
+| `DEPLOY_COMPOSE_FILES` | Mely compose fájlokat használja az indított build (képponttal elválasztva). |
+| `DEPLOY_SERVICES` | Mely szolgáltatásokat építse újra a gomb (alap: `cv chat-backend`). |
+| `DEPLOY_SOURCE_DIR` | A helper által mountolt forráskönyvtár (alap: a stack könyvtára). |
 
 A compose **fail-fast**: hiányzó kötelező érték esetén (`${VAR:?}`) nem indul
 el gyenge jelszóval — próbáld ki üres `ADMIN_TOKEN`-nel a
@@ -99,6 +148,10 @@ el gyenge jelszóval — próbáld ki üres `ADMIN_TOKEN`-nel a
 * Nem-root futásidejű userek (uid 101 / `nodejs`), `init: true` a szignálkezeléshez.
 * Élesben az admin API és az adatbázis UI a host loopbackjére kötve; csak a
   weboldal publikus.
+* A rebuild helper az egyetlen konténer a Docker socket birtokában: opt-in
+  profile, `DEPLOY_ENABLED` kapcsoló, egyetlen beégetett parancs, minden híváson
+  `ADMIN_TOKEN`, read-only forrás mount, publikált port nélkül, minden
+  capability eldobva, és a repository `.env`-jét nem tudja kiolvasni.
 * nginx: `server_tokens off`, biztonsági headerek, API rate limit (20 r/s per IP,
   burst 40 → 429), 16 kB API body limit, metódus allow-list (405), `X-Powered-By`
   elrejtve, timeoutok korlátozva.

@@ -28,3 +28,9 @@ services:
       # In development phpMyAdmin is reachable from the LAN; production pins it
       # to the host loopback interface.
       - "${PHPMYADMIN_BIND:-0.0.0.0}:8081:80"
+
+  deployer:
+    environment:
+      # The dev stack is started with this overlay, so the rebuild it triggers
+      # has to include it as well.
+      COMPOSE_FILE: docker-compose.yml:docker-compose.override.yml
