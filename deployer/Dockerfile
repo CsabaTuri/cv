@@ -6,7 +6,7 @@
 # itself is plain Node with no dependencies, so nothing is installed at build
 # time beyond the CLI packages.
 # ---------------------------------------------------------------------------
-FROM node:20-alpine
+FROM node:26-alpine
 
 RUN apk add --no-cache docker-cli docker-cli-compose docker-cli-buildx
 
