@@ -1,0 +1,51 @@
+services:
+
+  # -------------------------------------------------------------------------
+  # portfolio - static portfolio website (Next.js SSG, served by nginx).
+  # Built from ./portfolio. Host port 3036.
+  # -------------------------------------------------------------------------
+  portfolio:
+    build:
+      context: ./portfolio
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN: ${NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN:-}
+        NEXT_PUBLIC_CRISP_WEBSITE_ID: ${CRISP_WEBSITE_ID}
+    container_name: portfolio
+    environment:
+      - NEXT_PUBLIC_CRISP_WEBSITE_ID=${CRISP_WEBSITE_ID}
+      - NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN=${NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN:-}
+    env_file:
+      - .env
+    restart: unless-stopped
+    ports:
+      - "3036:80"
+    networks:
+      exitnode-bridge:
+        ipv4_address: 172.31.255.2
+
+  crisp-webhook:
+    build: ./backend
+    container_name: crisp_webhook
+    restart: always
+    ports:
+      - "3111:3000"
+    environment:
+      - PORT=3000
+      - CRISP_IDENTIFIER=${CRISP_IDENTIFIER}
+      - CRISP_KEY=${CRISP_KEY}
+      - CRISP_WEBSITE_ID=${CRISP_WEBSITE_ID}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+    env_file:
+      - .env
+    networks:
+      exitnode-bridge:
+        ipv4_address: 172.31.255.3
+
+networks:
+  exitnode-bridge:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.255.0/24
+          gateway: "172.31.255.1"

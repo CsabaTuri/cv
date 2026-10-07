@@ -1,0 +1,17 @@
+# dependencies
+node_modules
+
+# next.js
+.next
+out
+build
+dist
+
+# next-intl generated type declarations
+messages/*.d.json.ts
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+.env*

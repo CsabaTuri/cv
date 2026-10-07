@@ -1,0 +1,115 @@
+{
+  "metadata": {
+    "title": "Túri Csaba — DevOps & Systems Operations Specialist",
+    "description": "Portfolio of Túri Csaba: DevOps and systems operations specialist focused on automation, virtualization, containerization and Linux infrastructure."
+  },
+  "nav": {
+    "about": "About",
+    "skills": "Skills",
+    "experience": "Experience",
+    "contact": "Contact"
+  },
+  "hero": {
+    "name": "I'm Csaba Turi",
+    "roles": [
+      "QA Automation Engineer & DevOps Specialist",
+      "Test Automation & QA Expert",
+      "Web Developer (PHP)"
+    ],
+    "subtitle": "Bridging software quality, automation, and infrastructure from code to production.",
+    "ctaPrimary": "Get in touch",
+    "ctaSecondary": "View my skills",
+    "scroll": "Scroll down"
+  },
+  "about": {
+    "subtitle": "Professional summary",
+    "title": "About Me",
+    "p1": "I am a technical specialist with over <strong>8 years of web testing</strong> and <strong>5+ years of PHP development</strong> experience, bridging the gap between quality assurance, DevOps practices, and systems engineering.",
+    "p2": "My expertise lies in architecting scalable <strong>CI/CD pipelines</strong>, managing <strong>containerized (Docker, Minikube)</strong> and <strong>virtualized (VMware, KVM)</strong> environments, and designing automated E2E testing frameworks (Playwright, Robot Framework). Whether working on-premise or in the cloud, my goal is to build highly reliable, automated, and maintainable infrastructure."
+  },
+  "skills": {
+    "subtitle": "Technologies and tools I work with",
+    "title": "Core Competencies",
+    "virtualization": "Virtualization",
+    "containers": "Containerization & DevOps",
+    "os": "Operating Systems",
+    "programming": "Programming & Scripting",
+    "testing": "Test Automation & QA",
+    "ai": "AI & Workflow Automation",
+    "databases": "Databases",
+    "infrastructure": "Infrastructure & Security",
+    "tools": "Tools & Systems"
+  },
+  "experience": {
+    "subtitle": "What I have been working on",
+    "title": "Experience & Projects",
+    "items": [
+      {
+        "title": "Test Automation & QA",
+        "points": [
+          "Over 8 years of experience in software testing.",
+          "Building and maintaining automated tests with Katalon and Robot Framework."
+        ],
+        "tags": ["Katalon", "Robot Framework", "Test Automation", "QA"]
+      },
+      {
+        "title": "Web Development",
+        "points": [
+          "Over 5 years of experience in web development.",
+          "Developing with PHP, HTML, CSS, JavaScript and MySQL."
+        ],
+        "tags": ["PHP", "HTML", "CSS", "JavaScript", "MySQL"]
+      },
+      {
+        "title": "Infrastructure, Virtualization & Containerization",
+        "points": [
+          "Managing and maintaining virtualization technologies (VMware, KVM, QEMU) and container-based systems.",
+          "Operating Debian-based server environments and building automated backup and recovery routines.",
+          "Administering various Linux distributions (Debian, Arch, Ubuntu, CachyOS) and network troubleshooting."
+        ],
+        "tags": ["VMware", "KVM", "QEMU", "Docker", "Debian"]
+      },
+      {
+        "title": "Automation & CI/CD",
+        "points": [
+          "Integrating and automating development processes using Jenkins.",
+          "Designing and implementing automated workflows."
+        ],
+        "tags": ["Jenkins", "CI/CD", "Automation"]
+      },
+      {
+        "title": "Software Development & System Design",
+        "points": [
+          "Building the Docker Compose architecture and monitoring endpoints of a local-first software infrastructure (szeged-tisza-ai-platform).",
+          "Optimizing Git repositories and streamlining version control processes."
+        ],
+        "tags": ["Docker Compose", "Git", "Monitoring"]
+      }
+    ]
+  },
+  "contact": {
+    "subtitle": "Let's build something stable and scalable together",
+    "title": "Get in Touch",
+    "emailValue": "contact@turicsaba.hu"
+  },
+  "cv": {
+    "label": "Download CV",
+    "hungarian": "Magyar CV",
+    "english": "English CV"
+  },
+  "footer": {
+    "rights": "All rights reserved."
+  },
+  "a11y": {
+    "themeToggle": "Toggle dark mode",
+    "langToggle": "Switch language",
+    "menu": "Open menu",
+    "closeMenu": "Close menu"
+  },
+  "notFound": {
+    "code": "404",
+    "title": "Page not found",
+    "description": "The page you are looking for doesn't exist or has been moved.",
+    "home": "Back to home"
+  }
+}
