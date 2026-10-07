@@ -1,124 +1,450 @@
 // chat-backend/server.js
 //
-// Custom (non-Crisp) portfolio chat -> n8n webhook proxy.
+// Chat API for the portfolio: the visitor widget on the left, the admin inbox
+// on the right, MySQL underneath. No external service, no AI.
 //
-// The portfolio is a static export, so the browser cannot call the n8n webhook
-// directly without shipping the credential to every visitor. This small
-// service keeps the credential server-side and forwards the chat messages.
+// Visitor API:
+//   POST /api/chat                     { sessionId?, message }
+//     -> { ok, sessionId, message: { id, role, body, createdAt } }
+//   GET  /api/chat/messages?sessionId=&afterId=
+//     -> { ok, messages: [{ id, role, body, createdAt }], cursor }
 //
-// API:
-//   GET  /health  -> { ok: true }
-//   POST /api/chat
-//     body:    { sessionId?: string, message: string }
-//     returns: { ok: true, reply: string | null } or { ok: false, error: string }
+// Site copy (public read, admin write):
+//   GET  /api/content                 -> { ok, content: { key: value } }
+//   GET  /api/admin/content           -> { ok, fields: [{ key, group, label,
+//          multiline, json, value, updatedAt }] }
+//   PUT  /api/admin/content           -> { values: { key: value } } -> { ok, saved }
+//   Everything the site displays comes from here; the catalogue of keys and the
+//   default copy lives in content.js and is seeded into `site_content`.
 //
-// Required environment variables (set in the repo root .env):
-//   N8N_WEBHOOK_URL    full production URL of the n8n webhook
-//   N8N_WEBHOOK_TOKEN  credential sent as `Authorization: Bearer <token>`
+// Admin API (Authorization: Bearer <ADMIN_TOKEN>):
+//   GET  /api/admin/conversations
+//     -> { ok, conversations: [{ id, number, createdAt, lastMessageAt,
+//          messageCount, unread, lastMessage: { role, body, createdAt } }] }
+//     One entry per visitor session, newest activity first.
+//   GET  /api/admin/conversations/:id/messages?afterId=
+//     -> { ok, messages: [...], cursor }
+//   POST /api/admin/conversations/:id/reply   { message }
+//     -> { ok, message: { id, role, body, createdAt } }
 //
-// Optional:
-//   PORT               port to listen on (default 3000)
+// Environment:
+//   DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD   MySQL connection
+//   ADMIN_TOKEN                                      guards /api/admin/*
+//   PORT                                             default 3000
 
+import {randomUUID, timingSafeEqual} from 'node:crypto';
 import express from 'express';
+import mysql from 'mysql2/promise';
+import {CONTENT_FIELDS, storedValue} from './content.js';
 
 const app = express();
-app.use(express.json({ limit: '32kb' }));
+app.use(express.json({limit: '32kb'}));
 
-const MAX_MESSAGE_LENGTH = 2000;
-const UPSTREAM_TIMEOUT_MS = 60_000;
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN ?? '';
+const MAX_MESSAGE_LENGTH = 4000;
+const MAX_ID_LENGTH = 64;
 
-// Text fields an n8n "Respond to Webhook" node commonly returns.
-const REPLY_KEYS = ['reply', 'output', 'text', 'answer', 'message', 'content'];
-
-// Pulls a plain-text answer out of whatever shape the n8n workflow returns.
-function extractReply(payload) {
-  if (typeof payload === 'string') return payload.trim() || null;
-  if (Array.isArray(payload)) return extractReply(payload[0]);
-
-  if (payload && typeof payload === 'object') {
-    for (const key of REPLY_KEYS) {
-      const value = payload[key];
-      if (typeof value === 'string' && value.trim()) return value.trim();
-    }
-  }
-
-  return null;
-}
-
-app.get('/health', (_req, res) => {
-  res.json({ ok: true });
+const pool = mysql.createPool({
+  host: process.env.DB_HOST ?? 'mysql',
+  port: Number(process.env.DB_PORT ?? 3306),
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  waitForConnections: true,
+  connectionLimit: 5,
+  charset: 'utf8mb4',
+  timezone: 'Z',
 });
 
-app.post('/api/chat', async (req, res) => {
-  const webhookUrl = process.env.N8N_WEBHOOK_URL;
-  const webhookToken = process.env.N8N_WEBHOOK_TOKEN;
+// Store and read every timestamp in UTC, independent of the server time zone.
+pool.on('connection', (connection) => {
+  connection.query("SET time_zone = '+00:00'");
+});
 
-  if (!webhookUrl || !webhookToken) {
-    console.error(
-      '[chat] N8N_WEBHOOK_URL or N8N_WEBHOOK_TOKEN is not configured',
+const SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS conversations (
+     id CHAR(36) NOT NULL PRIMARY KEY,
+     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     last_message_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     visitor_ip VARCHAR(45) NULL,
+     user_agent VARCHAR(255) NULL,
+     INDEX idx_last_message (last_message_at)
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+  `CREATE TABLE IF NOT EXISTS messages (
+     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+     conversation_id CHAR(36) NOT NULL,
+     role ENUM('visitor','admin') NOT NULL,
+     body TEXT NOT NULL,
+     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     INDEX idx_conversation (conversation_id, id),
+     CONSTRAINT fk_messages_conversation FOREIGN KEY (conversation_id)
+       REFERENCES conversations(id) ON DELETE CASCADE
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+  `CREATE TABLE IF NOT EXISTS site_content (
+     \`key\` VARCHAR(64) NOT NULL PRIMARY KEY,
+     value MEDIUMTEXT NOT NULL,
+     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+       ON UPDATE CURRENT_TIMESTAMP
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+];
+
+// Seeds the catalogue: existing rows are kept, so admin edits survive restarts.
+async function seedContent() {
+  for (const field of CONTENT_FIELDS) {
+    await pool.query(
+      'INSERT IGNORE INTO site_content (\`key\`, value) VALUES (?, ?)',
+      [field.key, storedValue(field)],
     );
-    return res
-      .status(503)
-      .json({ ok: false, error: 'Chat backend is not configured' });
   }
 
-  const message =
-    typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+  // Drop rows whose field no longer exists in the catalogue.
+  await pool.query('DELETE FROM site_content WHERE `key` NOT IN (?)', [
+    CONTENT_FIELDS.map((field) => field.key),
+  ]);
 
-  if (!message) {
-    return res.status(400).json({ ok: false, error: 'Missing message' });
+  console.log(`[chat] content catalogue ready (${CONTENT_FIELDS.length} fields)`);
+}
+
+// MySQL may still be starting up when this container comes up.
+async function initDatabase() {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      for (const statement of SCHEMA) await pool.query(statement);
+      await seedContent();
+      console.log('[chat] database ready');
+      return;
+    } catch (error) {
+      if (attempt >= 30) throw error;
+      console.warn(`[chat] database not ready (attempt ${attempt}): ${error.code ?? error.message}`);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
   }
+}
 
-  if (message.length > MAX_MESSAGE_LENGTH) {
-    return res.status(413).json({ ok: false, error: 'Message too long' });
+function toMessage(row) {
+  return {
+    id: Number(row.id),
+    role: row.role,
+    body: row.body,
+    createdAt: new Date(row.created_at).toISOString(),
+  };
+}
+
+function isUuidLike(value) {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= MAX_ID_LENGTH &&
+    /^[A-Za-z0-9_-]+$/.test(value)
+  );
+}
+
+function readMessage(body) {
+  const message = typeof body?.message === 'string' ? body.message.trim() : '';
+  if (!message) return {error: 'Missing message'};
+  if (message.length > MAX_MESSAGE_LENGTH) return {error: 'Message too long'};
+  return {message};
+}
+
+function readAfterId(query) {
+  const parsed = Number.parseInt(String(query?.afterId ?? '0'), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+// Constant-time comparison of the `Authorization` header against the token.
+function isAdmin(req) {
+  if (!ADMIN_TOKEN) return false;
+
+  const header = req.get('authorization') ?? '';
+  const provided = header.startsWith('Bearer ') ? header.slice(7) : header;
+  const a = Buffer.from(provided);
+  const b = Buffer.from(ADMIN_TOKEN);
+
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+function requireAdmin(req, res, next) {
+  if (isAdmin(req)) return next();
+  return res.status(401).json({ok: false, error: 'Unauthorized'});
+}
+
+async function insertMessage(conversationId, role, body) {
+  const [result] = await pool.query(
+    'INSERT INTO messages (conversation_id, role, body) VALUES (?, ?, ?)',
+    [conversationId, role, body],
+  );
+  await pool.query('UPDATE conversations SET last_message_at = CURRENT_TIMESTAMP WHERE id = ?', [
+    conversationId,
+  ]);
+
+  const [rows] = await pool.query('SELECT * FROM messages WHERE id = ?', [result.insertId]);
+  return toMessage(rows[0]);
+}
+
+async function ensureConversation(sessionId, req) {
+  const [rows] = await pool.query('SELECT id FROM conversations WHERE id = ?', [sessionId]);
+  if (rows.length) return sessionId;
+
+  const forwarded = req.get('x-forwarded-for')?.split(',')[0]?.trim();
+  const ip = forwarded || req.socket.remoteAddress || null;
+  const userAgent = (req.get('user-agent') ?? '').slice(0, 255) || null;
+
+  await pool.query(
+    'INSERT INTO conversations (id, visitor_ip, user_agent) VALUES (?, ?, ?)',
+    [sessionId, ip?.slice(0, 45) ?? null, userAgent],
+  );
+
+  return sessionId;
+}
+
+app.get(['/health', '/api/health'], async (_req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    return res.json({ok: true, database: true});
+  } catch {
+    return res.status(503).json({ok: false, database: false});
   }
+});
 
-  const sessionId =
-    typeof req.body?.sessionId === 'string' && req.body.sessionId
-      ? req.body.sessionId
-      : null;
+// --- Site copy -------------------------------------------------------------
+
+app.get('/api/content', async (_req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT `key`, value FROM site_content');
+
+    // Defaults from content.js, overwritten by whatever the admin saved.
+    const content = {};
+    for (const field of CONTENT_FIELDS) content[field.key] = storedValue(field);
+    for (const row of rows) content[row.key] = row.value;
+
+    return res.json({ok: true, content});
+  } catch (dbError) {
+    console.error('[chat] failed to read the content:', dbError);
+    return res.status(500).json({ok: false, error: 'Could not read the content'});
+  }
+});
+
+// --- Visitor API -----------------------------------------------------------
+
+app.post('/api/chat', async (req, res) => {
+  const {message, error} = readMessage(req.body);
+  if (error) return res.status(400).json({ok: false, error});
+
+  const requested = req.body?.sessionId;
+  const sessionId = isUuidLike(requested) ? requested : randomUUID();
 
   try {
-    const upstream = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${webhookToken}`,
-      },
-      body: JSON.stringify({
-        sessionId,
-        message,
-        source: 'portfolio-chat',
-        sentAt: new Date().toISOString(),
-      }),
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    await ensureConversation(sessionId, req);
+    const stored = await insertMessage(sessionId, 'visitor', message);
+    return res.status(201).json({ok: true, sessionId, message: stored});
+  } catch (dbError) {
+    console.error('[chat] failed to store message:', dbError);
+    return res.status(500).json({ok: false, error: 'Could not store message'});
+  }
+});
+
+app.get('/api/chat/messages', async (req, res) => {
+  const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : '';
+  if (!isUuidLike(sessionId)) {
+    return res.status(400).json({ok: false, error: 'Missing sessionId'});
+  }
+
+  const afterId = readAfterId(req.query);
+
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM messages WHERE conversation_id = ? AND id > ? ORDER BY id LIMIT 200',
+      [sessionId, afterId],
+    );
+    const messages = rows.map(toMessage);
+    return res.json({
+      ok: true,
+      messages,
+      cursor: messages.length ? messages[messages.length - 1].id : afterId,
+    });
+  } catch (dbError) {
+    console.error('[chat] failed to read messages:', dbError);
+    return res.status(500).json({ok: false, error: 'Could not read messages'});
+  }
+});
+
+// --- Admin API -------------------------------------------------------------
+
+app.get('/api/admin/conversations', requireAdmin, async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT c.id,
+              c.created_at,
+              (SELECT COUNT(*) FROM conversations c2
+                WHERE c2.created_at <= c.created_at) AS visitor_number,
+              c.last_message_at,
+              c.visitor_ip,
+              (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS message_count,
+              (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id
+                 AND m.role = 'visitor'
+                 AND m.id > COALESCE((SELECT MAX(a.id) FROM messages a
+                                       WHERE a.conversation_id = c.id AND a.role = 'admin'), 0)
+              ) AS unread,
+              (SELECT m.body FROM messages m WHERE m.conversation_id = c.id
+                 ORDER BY m.id DESC LIMIT 1) AS last_body,
+              (SELECT m.role FROM messages m WHERE m.conversation_id = c.id
+                 ORDER BY m.id DESC LIMIT 1) AS last_role,
+              (SELECT m.created_at FROM messages m WHERE m.conversation_id = c.id
+                 ORDER BY m.id DESC LIMIT 1) AS last_created_at
+         FROM conversations c
+        WHERE EXISTS (SELECT 1 FROM messages m0 WHERE m0.conversation_id = c.id)
+        ORDER BY c.last_message_at DESC
+        LIMIT 200`,
+    );
+
+    const conversations = rows.map((row) => ({
+      id: row.id,
+      number: Number(row.visitor_number),
+      createdAt: new Date(row.created_at).toISOString(),
+      lastMessageAt: new Date(row.last_message_at).toISOString(),
+      visitorIp: row.visitor_ip,
+      messageCount: Number(row.message_count),
+      unread: Number(row.unread),
+      lastMessage: row.last_body
+        ? {
+            role: row.last_role,
+            body: row.last_body,
+            createdAt: new Date(row.last_created_at).toISOString(),
+          }
+        : null,
+    }));
+
+    return res.json({ok: true, conversations});
+  } catch (dbError) {
+    console.error('[chat] failed to list conversations:', dbError);
+    return res.status(500).json({ok: false, error: 'Could not list conversations'});
+  }
+});
+
+app.get('/api/admin/conversations/:id/messages', requireAdmin, async (req, res) => {
+  const afterId = readAfterId(req.query);
+
+  try {
+    const [rows] = await pool.query(
+      'SELECT * FROM messages WHERE conversation_id = ? AND id > ? ORDER BY id LIMIT 500',
+      [req.params.id, afterId],
+    );
+    const messages = rows.map(toMessage);
+    return res.json({
+      ok: true,
+      messages,
+      cursor: messages.length ? messages[messages.length - 1].id : afterId,
+    });
+  } catch (dbError) {
+    console.error('[chat] failed to read conversation:', dbError);
+    return res.status(500).json({ok: false, error: 'Could not read conversation'});
+  }
+});
+
+app.post('/api/admin/conversations/:id/reply', requireAdmin, async (req, res) => {
+  const {message, error} = readMessage(req.body);
+  if (error) return res.status(400).json({ok: false, error});
+
+  try {
+    const [rows] = await pool.query('SELECT id FROM conversations WHERE id = ?', [
+      req.params.id,
+    ]);
+    if (!rows.length) return res.status(404).json({ok: false, error: 'Unknown conversation'});
+
+    const stored = await insertMessage(req.params.id, 'admin', message);
+    return res.status(201).json({ok: true, message: stored});
+  } catch (dbError) {
+    console.error('[chat] failed to store reply:', dbError);
+    return res.status(500).json({ok: false, error: 'Could not store reply'});
+  }
+});
+
+app.get('/api/admin/content', requireAdmin, async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT `key`, value, updated_at FROM site_content',
+    );
+    const stored = new Map(rows.map((row) => [row.key, row]));
+
+    const fields = CONTENT_FIELDS.map((field) => {
+      const row = stored.get(field.key);
+      return {
+        key: field.key,
+        group: field.group,
+        label: field.label,
+        multiline: Boolean(field.multiline),
+        json: Boolean(field.json),
+        value: row ? row.value : storedValue(field),
+        updatedAt: row ? new Date(row.updated_at).toISOString() : null,
+      };
     });
 
-    const raw = await upstream.text();
+    return res.json({ok: true, fields});
+  } catch (dbError) {
+    console.error('[chat] failed to read the content fields:', dbError);
+    return res.status(500).json({ok: false, error: 'Could not read the content'});
+  }
+});
 
-    if (!upstream.ok) {
-      console.error(`[chat] n8n responded with status ${upstream.status}`);
-      return res.status(502).json({ ok: false, error: 'Upstream error' });
+app.put('/api/admin/content', requireAdmin, async (req, res) => {
+  const values = req.body?.values;
+  if (!values || typeof values !== 'object' || Array.isArray(values)) {
+    return res.status(400).json({ok: false, error: 'Missing values'});
+  }
+
+  const known = new Map(CONTENT_FIELDS.map((field) => [field.key, field]));
+  const updates = [];
+
+  for (const [key, raw] of Object.entries(values)) {
+    const field = known.get(key);
+    if (!field || typeof raw !== 'string') continue;
+
+    if (raw.length > 20000) {
+      return res.status(413).json({ok: false, error: `Value too long: ${key}`});
     }
 
-    let reply = null;
-    try {
-      reply = extractReply(raw ? JSON.parse(raw) : null);
-    } catch {
-      // The workflow answered with a plain-text body.
-      reply = extractReply(raw);
+    if (field.json) {
+      try {
+        JSON.parse(raw);
+      } catch {
+        return res
+          .status(400)
+          .json({ok: false, error: `Invalid JSON in field: ${key}`});
+      }
     }
 
-    return res.json({ ok: true, reply });
-  } catch (error) {
-    console.error('[chat] n8n request failed:', error);
-    return res
-      .status(502)
-      .json({ ok: false, error: 'Upstream request failed' });
+    updates.push([key, raw]);
+  }
+
+  if (!updates.length) {
+    return res.status(400).json({ok: false, error: 'No valid fields'});
+  }
+
+  try {
+    for (const [key, value] of updates) {
+      await pool.query(
+        'INSERT INTO site_content (`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?',
+        [key, value, value],
+      );
+    }
+
+    return res.json({ok: true, saved: updates.length});
+  } catch (dbError) {
+    console.error('[chat] failed to save the content:', dbError);
+    return res.status(500).json({ok: false, error: 'Could not save the content'});
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Custom chat -> n8n webhook proxy running on port ${PORT}`);
+
+await initDatabase();
+
+const server = app.listen(PORT, () => {
+  console.log(`Chat backend (MySQL) listening on port ${PORT}`);
 });
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    server.close(() => pool.end().then(() => process.exit(0)));
+  });
+}

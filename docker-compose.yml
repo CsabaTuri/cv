@@ -2,7 +2,8 @@ services:
 
   # -------------------------------------------------------------------------
   # portfolio - static portfolio website (Next.js SSG, served by nginx).
-  # Built from ./portfolio. Host port 3036.
+  # Also serves /admin (the chat inbox) from the same static export.
+  # Host port 3036.
   # -------------------------------------------------------------------------
   portfolio:
     build:
@@ -10,13 +11,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN: ${NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN:-}
-        NEXT_PUBLIC_CRISP_WEBSITE_ID: ${CRISP_WEBSITE_ID}
     container_name: portfolio
-    environment:
-      - NEXT_PUBLIC_CRISP_WEBSITE_ID=${CRISP_WEBSITE_ID}
-      - NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN=${NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN:-}
-    env_file:
-      - .env
     restart: unless-stopped
     ports:
       - "3036:80"
@@ -24,29 +19,11 @@ services:
       exitnode-bridge:
         ipv4_address: 172.31.255.2
 
-  crisp-webhook:
-    build: ./backend
-    container_name: crisp_webhook
-    restart: always
-    ports:
-      - "3111:3000"
-    environment:
-      - PORT=3000
-      - CRISP_IDENTIFIER=${CRISP_IDENTIFIER}
-      - CRISP_KEY=${CRISP_KEY}
-      - CRISP_WEBSITE_ID=${CRISP_WEBSITE_ID}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-    env_file:
-      - .env
-    networks:
-      exitnode-bridge:
-        ipv4_address: 172.31.255.3
-
   # -------------------------------------------------------------------------
-  # chat-backend - custom (non-Crisp) chat widget backend.
-  # Proxies the portfolio chat messages to the n8n webhook, keeping the
-  # webhook credential server-side. Reached by the site through the nginx
-  # /api/chat proxy at 172.31.255.2. Host port 3112.
+  # chat-backend - custom chat API + admin API.
+  # Stores the conversations in MySQL, serves the visitor widget and the
+  # /admin inbox. The site reaches it through the nginx /api/ proxy.
+  # Host port 3112.
   # -------------------------------------------------------------------------
   chat-backend:
     build: ./chat-backend
@@ -56,13 +33,67 @@ services:
       - "3112:3000"
     environment:
       - PORT=3000
-      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
-      - N8N_WEBHOOK_TOKEN=${N8N_WEBHOOK_TOKEN}
-    env_file:
-      - .env
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=${MYSQL_DATABASE}
+      - DB_USER=${MYSQL_USER}
+      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - ADMIN_TOKEN=${ADMIN_TOKEN}
+    depends_on:
+      mysql:
+        condition: service_healthy
     networks:
       exitnode-bridge:
         ipv4_address: 172.31.255.4
+
+  # -------------------------------------------------------------------------
+  # mysql - chat message store (no host port, internal only).
+  # -------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.4
+    container_name: chat_mysql
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - TZ=${TZ:-Europe/Budapest}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      exitnode-bridge:
+        ipv4_address: 172.31.255.5
+
+  # -------------------------------------------------------------------------
+  # phpmyadmin - web UI for the chat database.
+  # Login with MYSQL_USER / MYSQL_PASSWORD (or MYSQL_ROOT_PASSWORD) from .env.
+  # Host port 8081 (LAN only; do not expose it publicly).
+  # -------------------------------------------------------------------------
+  phpmyadmin:
+    image: phpmyadmin:5-apache
+    container_name: chat_phpmyadmin
+    restart: always
+    ports:
+      - "${PHPMYADMIN_PORT:-8081}:80"
+    environment:
+      - PMA_HOST=mysql
+      - PMA_PORT=3306
+      - UPLOAD_LIMIT=64M
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      exitnode-bridge:
+        ipv4_address: 172.31.255.6
+
+volumes:
+  mysql-data:
 
 networks:
   exitnode-bridge:

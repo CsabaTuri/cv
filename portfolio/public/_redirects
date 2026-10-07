@@ -1,4 +1,0 @@
-# Hungarian is the default locale and is served from the root ("/"), so legacy
-# prefixed URLs are redirected to the unprefixed version.
-/hu/  /  301
-/hu   /  301

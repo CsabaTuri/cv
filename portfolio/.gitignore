@@ -7,9 +7,6 @@ out
 build
 dist
 
-# next-intl generated type declarations
-messages/*.d.json.ts
-
 # misc
 .DS_Store
 *.pem

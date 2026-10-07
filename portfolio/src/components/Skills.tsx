@@ -2,12 +2,12 @@
 
 import type {ComponentType, SVGProps} from 'react';
 import {motion, type Variants} from 'framer-motion';
-import {useTranslations} from 'next-intl';
 import {
   skillCategories,
   type SkillIcon,
   type SkillCategoryKey,
 } from '@/data/skills';
+import {useText} from './ContentProvider';
 import {
   Server,
   Container,
@@ -43,32 +43,30 @@ const card: Variants = {
 };
 
 export default function Skills() {
-  const t = useTranslations('skills');
+  const subtitle = useText('skills.subtitle');
+  const title = useText('skills.title');
 
   const titles: Record<SkillCategoryKey, string> = {
-    testing: t('testing'),
-    containers: t('containers'),
-    virtualization: t('virtualization'),
-    ai: t('ai'),
-    os: t('os'),
-    programming: t('programming'),
-    databases: t('databases'),
-    infrastructure: t('infrastructure'),
-    tools: t('tools'),
+    testing: useText('skills.testing'),
+    containers: useText('skills.containers'),
+    virtualization: useText('skills.virtualization'),
+    ai: useText('skills.ai'),
+    os: useText('skills.os'),
+    programming: useText('skills.programming'),
+    databases: useText('skills.databases'),
+    infrastructure: useText('skills.infrastructure'),
+    tools: useText('skills.tools'),
   };
 
   return (
-    <section
-      id="skills"
-      className="scroll-mt-24 bg-gray-50 px-6 py-24 dark:bg-gray-900/40"
-    >
+    <section id="skills" className="scroll-mt-24 bg-gray-50 px-6 py-24">
       <div className="mx-auto max-w-6xl">
         <div className="text-center">
-          <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
-            {t('subtitle')}
+          <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">
+            {subtitle}
           </p>
           <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
-            {t('title')}
+            {title}
           </h2>
         </div>
 
@@ -85,10 +83,10 @@ export default function Skills() {
               <motion.div
                 key={category.key}
                 variants={card}
-                className="group rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-xl dark:border-gray-800 dark:bg-gray-900 dark:hover:border-indigo-500/50"
+                className="group rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-xl"
               >
                 <div className="flex items-center gap-3">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition-transform group-hover:scale-110 dark:bg-indigo-500/10 dark:text-indigo-400">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 transition-transform group-hover:scale-110">
                     <Icon className="h-5 w-5" />
                   </span>
                   <h3 className="text-lg font-semibold">
@@ -99,7 +97,7 @@ export default function Skills() {
                   {category.items.map((item) => (
                     <li
                       key={item}
-                      className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                      className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700"
                     >
                       {item}
                     </li>

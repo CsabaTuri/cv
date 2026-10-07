@@ -1,12 +1,15 @@
-import {useTranslations} from 'next-intl';
+'use client';
+
+import {useText} from './ContentProvider';
 
 export default function Footer() {
-  const t = useTranslations('footer');
+  const siteName = useText('site.name');
+  const rights = useText('footer.rights');
 
   return (
-    <footer className="border-t border-gray-200 px-6 py-10 text-center text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
+    <footer className="border-t border-gray-200 px-6 py-10 text-center text-sm text-gray-500">
       <p>
-        © {new Date().getFullYear()} Túri Csaba. {t('rights')}
+        © {new Date().getFullYear()} {siteName}. {rights}
       </p>
     </footer>
   );
