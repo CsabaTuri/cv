@@ -182,6 +182,31 @@ GET    /api/admin/push/subscriptions
 POST   /api/admin/push/test      # teszt értesítés az admin böngészőinek
 ```
 
+## Tesztek és CI
+
+Minden a [`tests/`](./tests) könyvtárban van, és csak Node 20+ meg egy MySQL
+kell hozzá; külön adatbázist (`cv_chat_test`) használ, így nem nyúl a valódi
+adatokhoz:
+
+```bash
+npm ci --prefix chat-backend
+DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=cv_chat_test \
+DB_USER=chat DB_PASSWORD=chat ADMIN_TOKEN=ci-admin-token \
+  node --test tests/*.test.mjs
+```
+
+| Fájl | Mit fed le |
+| --- | --- |
+| `tests/api.test.mjs` | az API valódi MySQL ellen: látogatói folyam, cursorok, admin auth, válaszok, olvasatlan számláló, a szöveg-végpontok (validáció, JSON mezők, méretlimit), és a push (validáció, audience-szétválasztás, endpoint soha nem szivárog ki, hibás kézbesítés nem buktatja a chatet, kikapcsolt állapot) |
+| `tests/content.test.mjs` | a szövegkatalógus: egyedi kulcsok, JSON szerializálás, és hogy a frontend minden kért kulcsa létezik - a megfelelő hookkal |
+| `tests/assets.test.mjs` | a PWA (manifest mezők, ikonok a deklarált méretekkel, a worker handlerei), az nginx szabályok, és a compose invariánsok, amiket ez a stack már elrontott: nincs `latest`, nincs profile a rebuild helperen, a gateway a subnetjén belül, a VAPID kulcsok mindkét szolgáltatáshoz eljutnak, `.env.example` szinkronban |
+
+A [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) három jobot futtat
+minden pull requestnél és a `main`-re való pushnál: az oldal (typecheck +
+statikus export, benne a PWA fájlok), a fenti készlet `mysql:8.4` service ellen
+Node 20-on és 22-n, valamint az image-ek (mindkét overlay, a fail-fast őr `.env`
+nélkül, `docker compose build`, és `nginx -t` a megépített image-ben).
+
 ## Biztonsági intézkedések
 
 * Nincs sehol default credential; hiányzó érték megállítja a deployt.
@@ -268,6 +293,8 @@ visszaállítása dumpból történik: a séma `CREATE TABLE IF NOT EXISTS`-szel
 létre, ezért egy régebbi image egy újabb séma ellen szintén restore-t igényel.
 
 ## Dokumentáció
+
+A tesztkészlet leírása: [Tesztek és CI](#tesztek-és-ci).
 
 * [chat-backend/README.hu.md](./chat-backend/README.hu.md) — az API, benne a push végpontok.
 * [cv/README.md](./cv/README.md) — statikus önéletrajz oldal (angolul).

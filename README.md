@@ -183,6 +183,30 @@ GET    /api/admin/push/subscriptions
 POST   /api/admin/push/test      # test notification to the admin's browsers
 ```
 
+## Tests and CI
+
+Everything lives in [`tests/`](./tests) and needs nothing but Node 20+ and a
+MySQL; a separate database (`cv_chat_test`) keeps them away from real data:
+
+```bash
+npm ci --prefix chat-backend
+DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=cv_chat_test \
+DB_USER=chat DB_PASSWORD=chat ADMIN_TOKEN=ci-admin-token \
+  node --test tests/*.test.mjs
+```
+
+| File | Covers |
+| --- | --- |
+| `tests/api.test.mjs` | the API against a real MySQL: visitor flow, cursors, admin auth, replies, unread counts, the copy endpoints (validation, JSON fields, size limit), and push (validation, audience isolation, endpoints never leaked, a failing delivery that must not break the chat, and the disabled state) |
+| `tests/content.test.mjs` | the copy catalogue: unique keys, JSON serialisation, and that every key the frontend asks for exists - with the matching hook |
+| `tests/assets.test.mjs` | the PWA (manifest fields, icons on disk with the declared sizes, the worker's handlers), the nginx rules, and the compose invariants this stack got wrong before: no `latest`, no profile on the rebuild helper, the gateway inside its subnet, the VAPID keys reaching both services, `.env.example` in sync |
+
+[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs three jobs on every
+pull request and on pushes to `main`: the site (typecheck + static export,
+including the PWA files), the suite above against a `mysql:8.4` service on Node
+20 and 22, and the images (both overlays, the fail-fast guard without a `.env`,
+`docker compose build`, and `nginx -t` inside the built image).
+
 ## Security measures
 
 * No default credentials anywhere; missing values abort the deploy.
@@ -271,6 +295,8 @@ is created with `CREATE TABLE IF NOT EXISTS`, so an older image against a newer
 schema needs a restore as well.
 
 ## Documentation
+
+The test suite is described under [Tests and CI](#tests-and-ci).
 
 * [chat-backend/README.md](./chat-backend/README.md) — the API, including the push endpoints.
 * [cv/README.md](./cv/README.md) — static CV site, pages, build (English).

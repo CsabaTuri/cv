@@ -1,0 +1,172 @@
+# ---------------------------------------------------------------------------
+# CI: everything that has to hold before something reaches the host.
+#
+#   site   - TypeScript + the static export, including the PWA files
+#   api    - the test suite against a real MySQL (the same shape as the stack),
+#            on the runtime version and the current LTS
+#   docker - the compose files and the images themselves, plus the guard that
+#            the stack refuses to start without its secrets
+#
+# The tests live in tests/ and need no dependencies: `node --test` with the
+# standard library only. Run them locally with:
+#
+#   npm ci --prefix chat-backend
+#   DB_HOST=127.0.0.1 DB_PORT=3306 DB_NAME=cv_chat_test \
+#   DB_USER=chat DB_PASSWORD=chat ADMIN_TOKEN=ci-admin-token \
+#     node --test tests/*.test.mjs
+# ---------------------------------------------------------------------------
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  site:
+    name: Site (typecheck + static export)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: cv
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: cv/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build the static export
+        run: npm run build
+
+      - name: The export carries the app shell and the PWA files
+        run: |
+          for file in index.html admin/index.html 404.html sw.js manifest.webmanifest \
+                      icons/icon-192.png icons/icon-512.png apple-touch-icon.png; do
+            test -f "out/$file" || { echo "missing from the export: $file"; exit 1; }
+          done
+          grep -q 'rel="manifest"' out/index.html
+
+  api:
+    name: API (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 20 is what the images run, 22 is the current release.
+        node: ['20', '22']
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: cv_chat_test
+          MYSQL_USER: chat
+          MYSQL_PASSWORD: chat
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_NAME: cv_chat_test
+      DB_USER: chat
+      DB_PASSWORD: chat
+      ADMIN_TOKEN: ci-admin-token
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: chat-backend/package-lock.json
+
+      - name: Install the backend dependencies
+        run: npm ci --prefix chat-backend
+
+      - name: Syntax check every service
+        run: |
+          node --check chat-backend/server.js
+          node --check chat-backend/push.js
+          node --check chat-backend/content.js
+          node --check deployer/deployer.js
+          node --check cv/public/sw.js
+
+      - name: Tests (API, content catalogue, assets, compose guards)
+        run: node --test tests/*.test.mjs
+
+  docker:
+    name: Compose files and images
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compose environment for CI
+        run: |
+          cp .env.example .env
+          sed -i 's/^MYSQL_PASSWORD=$/MYSQL_PASSWORD=ci-password/' .env
+          sed -i 's/^MYSQL_ROOT_PASSWORD=$/MYSQL_ROOT_PASSWORD=ci-root-password/' .env
+          sed -i 's/^ADMIN_TOKEN=$/ADMIN_TOKEN=ci-admin-token/' .env
+          sed -i 's/^IMAGE_TAG_CV=.*/IMAGE_TAG_CV=ci/' .env
+          sed -i 's/^IMAGE_TAG_CHAT_BACKEND=.*/IMAGE_TAG_CHAT_BACKEND=ci/' .env
+          sed -i 's/^IMAGE_TAG_DEPLOYER=.*/IMAGE_TAG_DEPLOYER=ci/' .env
+
+      - name: Both overlays are valid
+        run: |
+          docker compose config -q
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q
+
+      - name: The stack refuses to start without secrets
+        run: |
+          mv .env .env.ci
+          if docker compose -f docker-compose.yml config -q >/dev/null 2>&1; then
+            echo "compose accepted a missing .env, the fail-fast is gone"
+            exit 1
+          fi
+          mv .env.ci .env
+
+      - name: Build the images
+        run: docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+
+      - name: The images carry the requested tags
+        run: |
+          for image in cv-web:ci cv-chat-backend:ci cv-deployer:ci; do
+            docker image inspect "$image" >/dev/null
+          done
+
+      - name: nginx accepts the configuration
+        run: docker run --rm --entrypoint nginx cv-web:ci -t
+
+      - name: The backend image ships the push module
+        run: |
+          docker run --rm --entrypoint node cv-chat-backend:ci \
+            -e "require('web-push'); console.log('web-push loads')"
