@@ -22,7 +22,7 @@ browser ──▶ cv (nginx-unprivileged, uid 101)
 | `chat-backend` | `cv-chat-backend:${IMAGE_TAG_CHAT_BACKEND}` (Node 20, user `nodejs`) | `3112:3000` | `app`, `data` | Chat + admin API. Read-only rootfs, all capabilities dropped. |
 | `mysql` | `mysql:8.4` | none | `data` (internal) | Messages, conversations, site copy. Read-only rootfs, capabilities denied by default. |
 | `phpmyadmin` | `phpmyadmin:5-apache` | `8081:80` | `data`, `pma` | Database UI for the operator. |
-| `deployer` | `cv-deployer:${IMAGE_TAG_DEPLOYER}` (Node 20 + Docker CLI) | none | `app` | Opt-in rebuild helper (compose profile `deploy`). Holds the Docker socket; see [One-click rebuild](#one-click-rebuild-admin-panel). |
+| `deployer` | `cv-deployer:${IMAGE_TAG_DEPLOYER}` (Node 20 + Docker CLI) | none | `app` | Rebuild helper for the admin panel, off unless `DEPLOY_ENABLED=true`. Holds the Docker socket; see [One-click rebuild](#one-click-rebuild-admin-panel). |
 
 `data` is `internal: true`: MySQL has no internet egress and cannot be reached
 from the host or the LAN. `pma` carries nothing but phpMyAdmin's published port
@@ -30,8 +30,8 @@ from the host or the LAN. `pma` carries nothing but phpMyAdmin's published port
 networks). The `app` subnet (`172.33.255.0/24`) is kept fixed on purpose — the
 host routes it.
 
-The `deployer` helper only starts with the `deploy` profile and publishes
-nothing: it is the single service with access to the Docker socket.
+The `deployer` helper publishes nothing: it is the single service with access to
+the Docker socket, and it does nothing at all unless `DEPLOY_ENABLED=true`.
 
 ## Compose files
 
@@ -48,8 +48,8 @@ docker compose up -d --build
 # production (base + prod, no dev overlay)
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
-# production + the optional rebuild helper behind the admin panel's button
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d
+# production: every service, including the rebuild helper behind the button
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 The production overlay pins the admin API and phpMyAdmin to the host loopback
@@ -87,26 +87,26 @@ The *Build* tab rebuilds and restarts the two images built from this repository
 phone or another machine. Content changes do **not** need it: the site copy
 lives in the database and is edited in the *Szövegek* tab without a rebuild.
 
-The helper is opt-in, because it is the one container with access to the Docker
-socket (root-equivalent on the host):
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d
-```
+The helper is part of the stack (it starts with everything else) and is switched
+off by `DEPLOY_ENABLED=false`, because it is the one container with access to the
+Docker socket (root-equivalent on the host). It is deliberately **not** behind a
+compose profile: a profiled service is skipped by the other invocations, and the
+leftover container then blocks the removal of the networks the rest of the stack
+shares - which takes the site down.
 
 | | |
 | --- | --- |
 | Service | `deployer`, container `cv_deployer`, no published port |
 | Command it runs | `docker compose up -d --build cv chat-backend` (hardcoded, never a shell) |
 | Auth | `Authorization: Bearer $ADMIN_TOKEN` on every endpoint except `/health` |
-| Switches | starts only with the `deploy` profile, acts only when `DEPLOY_ENABLED=true` |
+| Switch | acts only when `DEPLOY_ENABLED=true` (`false` serves status but refuses to build) |
 | Concurrency | one build at a time (a second request gets `409`) |
 | Output | the last 500 log lines in the *Build* tab, kept in the `deploy-state` volume |
 | Timeout | `DEPLOY_TIMEOUT_MS`, 15 minutes by default |
 
 The helper deliberately survives the rebuild it triggers, so the panel can still
-stream the log and show the result; if it is not running, the panel says so and
-prints the command above.
+stream the log and show the result; if the container is stopped, the panel says so
+and prints the command that starts it.
 
 Two things to keep in mind:
 
@@ -166,10 +166,10 @@ the image tags left out.
 * Non-root runtime users (uid 101 / `nodejs`), `init: true` for signal handling.
 * Admin API and database UI bound to the host loopback interface in production;
   only the site is public.
-* The rebuild helper is the only container with the Docker socket: opt-in
-  profile, `DEPLOY_ENABLED` switch, one hardcoded command, `ADMIN_TOKEN` on
-  every call, read-only source mount, no published port, all capabilities
-  dropped and no way to read the repository `.env`.
+* The rebuild helper is the only container with the Docker socket:
+  `DEPLOY_ENABLED` switch (off means it cannot build anything), one hardcoded
+  command, `ADMIN_TOKEN` on every call, read-only source mount, no published
+  port, all capabilities dropped and no way to read the repository `.env`.
 * nginx: server tokens off, security headers, API rate limiting (20 r/s per IP,
   burst 40 → 429), 16 kB API body limit, method allow-list (405), `X-Powered-By`
   hidden, request timeouts capped.
@@ -213,20 +213,19 @@ Rollback:
 
 ```bash
 # release: bump the version of the image(s) you changed in .env, then rebuild
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d --build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 # rollback: put the previous version back in .env, then start (no rebuild)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 Each image has its own version, which is why the site and the API can be
-released independently. Both commands include `--profile deploy` on purpose: the
-rebuild helper passes the tags on to the build it triggers, and it only picks up
-new values when the helper itself is recreated. The second command only works
-while the previous image is still on the host — do not prune it away. Rollback
-of the *database* is a restore from a dump: the schema is created with
-`CREATE TABLE IF NOT EXISTS`, so an older image against a newer schema needs a
-restore as well.
+released independently; the helper passes the tags on to the build it triggers,
+so it sees new values as soon as it is itself recreated by the same command. The
+second command only works while the previous image is still on the host — do not
+prune it away. Rollback of the *database* is a restore from a dump: the schema
+is created with `CREATE TABLE IF NOT EXISTS`, so an older image against a newer
+schema needs a restore as well.
 
 ## Documentation
 

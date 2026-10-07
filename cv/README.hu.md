@@ -18,7 +18,7 @@ megválaszolni.
 | Útvonal | Leírás |
 | --- | --- |
 | `/` | Az önéletrajz oldal a chat widgettel (jobb alsó sarok). |
-| `/admin/` | Admin panel három füllel: *Üzenetek* (beszélgetéslista, szál, válaszmező), *Szövegek* (az oldal szövegeinek szerkesztője) és *Build* (újrabuildelés egy gombnyomásra, opt-in — lásd [../README.hu.md](../README.hu.md#újrabuildelés-egy-gombnyomásra-admin-panel)). A `.env`-beli `ADMIN_TOKEN`-t kéri (a `localStorage`-ban marad). Nem indexelhető. |
+| `/admin/` | Admin panel három füllel: *Üzenetek* (beszélgetéslista, szál, válaszmező), *Szövegek* (az oldal szövegeinek szerkesztője) és *Build* (újrabuildelés egy gombnyomásra — lásd [../README.hu.md](../README.hu.md#újrabuildelés-egy-gombnyomásra-admin-panel)). A `.env`-beli `ADMIN_TOKEN`-t kéri (a `localStorage`-ban marad). Nem indexelhető. |
 
 ## Stack
 

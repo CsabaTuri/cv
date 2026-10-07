@@ -18,7 +18,7 @@ answered.
 | Route | Description |
 | --- | --- |
 | `/` | The CV site with the chat widget (bottom right). |
-| `/admin/` | Admin panel with three tabs: *Üzenetek* (conversation list, thread, reply box), *Szövegek* (the site copy editor) and *Build* (one-click rebuild, opt-in — see [../README.md](../README.md#one-click-rebuild-admin-panel)). Asks for the `ADMIN_TOKEN` from `.env` (kept in `localStorage`). Not indexable. |
+| `/admin/` | Admin panel with three tabs: *Üzenetek* (conversation list, thread, reply box), *Szövegek* (the site copy editor) and *Build* (one-click rebuild — see [../README.md](../README.md#one-click-rebuild-admin-panel)). Asks for the `ADMIN_TOKEN` from `.env` (kept in `localStorage`). Not indexable. |
 
 ## Stack
 

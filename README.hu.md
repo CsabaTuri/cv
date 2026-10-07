@@ -22,7 +22,7 @@ böngésző ──▶ cv (nginx-unprivileged, uid 101)
 | `chat-backend` | `cv-chat-backend:${IMAGE_TAG_CHAT_BACKEND}` (Node 20, `nodejs` user) | `3112:3000` | `app`, `data` | Chat + admin API. Read-only rootfs, minden capability eldobva. |
 | `mysql` | `mysql:8.4` | nincs | `data` (internal) | Üzenetek, beszélgetések, oldal-szövegek. Read-only rootfs, deny-by-default capability-k. |
 | `phpmyadmin` | `phpmyadmin:5-apache` | `8081:80` | `data`, `pma` | Adatbázis UI az üzemeltetőnek. |
-| `deployer` | `cv-deployer:${IMAGE_TAG_DEPLOYER}` (Node 20 + Docker CLI) | nincs | `app` | Opcionális rebuild helper (compose profile: `deploy`). Övé a Docker socket; lásd [Újrabuildelés](#újrabuildelés-egy-gombnyomásra-admin-panel). |
+| `deployer` | `cv-deployer:${IMAGE_TAG_DEPLOYER}` (Node 20 + Docker CLI) | nincs | `app` | Rebuild helper az admin panelhez, `DEPLOY_ENABLED=true` nélkül nem csinál semmit. Övé a Docker socket; lásd [Újrabuildelés](#újrabuildelés-egy-gombnyomásra-admin-panel). |
 
 A `data` hálózat `internal: true`: a MySQL-nek nincs internet-egress-e, és a
 hostról/LAN-ról sem érhető el. A `pma` hálózat csak a phpMyAdmin publikált
@@ -30,8 +30,8 @@ portját szolgálja (a Docker nem tud portot publikálni olyan konténeren, ami
 csak internal hálózaton van). Az `app` alhálózata (`172.33.255.0/24`)
 szándékosan fix — a host routolja.
 
-A `deployer` helper csak a `deploy` profile-lal indul, és semmit nem publikál:
-ez az egyetlen szolgáltatás, ami a Docker sockethez hozzáfér.
+A `deployer` helper semmit nem publikál: ez az egyetlen szolgáltatás, ami a
+Docker sockethez hozzáfér, és `DEPLOY_ENABLED=true` nélkül semmit nem csinál.
 
 ## Compose fájlok
 
@@ -48,8 +48,8 @@ docker compose up -d --build
 # éles (base + prod, dev override nélkül)
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
-# éles + az opcionális rebuild helper, ami az admin panel gombja mögött van
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d
+# éles: minden szolgáltatás, köztük a gomb mögötti rebuild helper
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
 Az éles overlay az admin API-t és a phpMyAdmin-t a host loopback interfészére
@@ -86,26 +86,26 @@ két image-et (`cv`, `chat-backend`) — kényelmes, ha telefonról vagy másik
 gépről nyúlsz a kódhoz. Tartalomhoz **nem** kell: az oldal szövegei az
 adatbázisban élnek, és a *Szövegek* fülön build nélkül szerkeszthetők.
 
-A helper opt-in, mert ez az egyetlen konténer, ami a Docker sockethez nyúl (ez
-a hoston root-joggal egyenértékű):
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d
-```
+A helper a stack része (minden mással együtt indul), és a `DEPLOY_ENABLED=false`
+kapcsolja ki, mert ez az egyetlen konténer, ami a Docker sockethez nyúl (ez a
+hoston root-joggal egyenértékű). Szándékosan **nincs** compose profile mögött:
+a profile-os szolgáltatást a többi hívás kihagyja, a visszamaradó konténer pedig
+blokkolja azoknak a hálózatoknak a törlését, amiket a stack többi része használ
+— ez pedig leviszi az oldalt.
 
 | | |
 | --- | --- |
 | Szolgáltatás | `deployer`, konténer: `cv_deployer`, publikált port nélkül |
 | Amit futtat | `docker compose up -d --build cv chat-backend` (fixen beégetve, shell nélkül) |
 | Auth | `Authorization: Bearer $ADMIN_TOKEN` minden végponton, kivéve a `/health`-et |
-| Kapcsolók | csak a `deploy` profile-lal indul, és csak `DEPLOY_ENABLED=true` esetén cselekszik |
+| Kapcsoló | csak `DEPLOY_ENABLED=true` esetén cselekszik (`false` esetén státuszt ad, de nem buildel) |
 | Párhuzamosság | egyszerre egy build fut (a második kérés `409`-et kap) |
 | Kimenet | az utolsó 500 naplósor a *Build* fülön, a `deploy-state` volume-ban tárolva |
 | Timeout | `DEPLOY_TIMEOUT_MS`, alapból 15 perc |
 
 A helper szándékosan túléli az általa indított buildet, így a panel közben
-folyamatosan tudja mutatni a naplót és a végét. Ha nem fut, a panel jelzi, és
-kiírja a fenti parancsot.
+folyamatosan tudja mutatni a naplót és a végét. Ha a konténer áll, a panel jelzi,
+és kiírja az indító parancsot.
 
 Két dolog, amit érdemes észben tartani:
 
@@ -162,10 +162,11 @@ vagy valamelyik image tag nélkül a `docker compose config` paranccsal.
 * Nem-root futásidejű userek (uid 101 / `nodejs`), `init: true` a szignálkezeléshez.
 * Élesben az admin API és az adatbázis UI a host loopbackjére kötve; csak a
   weboldal publikus.
-* A rebuild helper az egyetlen konténer a Docker socket birtokában: opt-in
-  profile, `DEPLOY_ENABLED` kapcsoló, egyetlen beégetett parancs, minden híváson
-  `ADMIN_TOKEN`, read-only forrás mount, publikált port nélkül, minden
-  capability eldobva, és a repository `.env`-jét nem tudja kiolvasni.
+* A rebuild helper az egyetlen konténer a Docker socket birtokában:
+  `DEPLOY_ENABLED` kapcsoló (`false` esetén semmit nem tud buildelni), egyetlen
+  beégetett parancs, minden híváson `ADMIN_TOKEN`, read-only forrás mount,
+  publikált port nélkül, minden capability eldobva, és a repository `.env`-jét
+  nem tudja kiolvasni.
 * nginx: `server_tokens off`, biztonsági headerek, API rate limit (20 r/s per IP,
   burst 40 → 429), 16 kB API body limit, metódus allow-list (405), `X-Powered-By`
   elrejtve, timeoutok korlátozva.
@@ -209,17 +210,16 @@ Visszaállás (rollback):
 
 ```bash
 # kiadás: emeld annak az image-nek a verzióját a .env-ben, amit módosítottál, majd build
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d --build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 # visszaállás: tedd vissza az előző verziót a .env-ben, majd indítás (build nélkül)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ```
 
-Minden image-nek saját verziója van, ezért az oldal és az API külön adható ki.
-Mindkét parancsban szándékosan ott a `--profile deploy`: a rebuild helper
-továbbadja a tageket az általa indított buildnek, viszont az új értékeket csak
-akkor veszi át, ha maga a helper is újraépül. A második parancs csak addig
-működik, amíg az előző image a hoston van — ne pruneld ki. Az *adatbázis*
+Minden image-nek saját verziója van, ezért az oldal és az API külön adható ki; a
+helper továbbadja a tageket az általa indított buildnek, és az új értékeket
+ugyanazzal a paranccsal veszi át, amint maga is újraépül. A második parancs csak
+addig működik, amíg az előző image a hoston van — ne pruneld ki. Az *adatbázis*
 visszaállítása dumpból történik: a séma `CREATE TABLE IF NOT EXISTS`-szel jön
 létre, ezért egy régebbi image egy újabb séma ellen szintén restore-t igényel.
 

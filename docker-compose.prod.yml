@@ -9,10 +9,8 @@
 #   * shorter log rotation with compression, longer shutdown grace periods and
 #     explicit open-file limits
 #
-# The optional rebuild helper is started by adding its profile:
-#
-#   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-#     --profile deploy up -d
+# The rebuild helper is part of the stack and is switched with DEPLOY_ENABLED,
+# not with a compose profile.
 #
 # Do not combine it with docker-compose.override.yml (that is the dev overlay).
 # =============================================================================

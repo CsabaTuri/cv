@@ -19,7 +19,7 @@ interface BuildStatus {
 type Availability = 'checking' | 'ok' | 'disabled' | 'unreachable';
 
 const ENABLE_COMMAND =
-  'docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile deploy up -d';
+  'docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d';
 
 function formatDuration(ms: number | null) {
   if (ms === null) return '';
@@ -70,7 +70,7 @@ export default function DeployPanel({
         onUnauthorized();
         return;
       }
-      // 502 without a running `deploy` profile: the helper is not there.
+      // 502 when the helper container is not running: nginx cannot resolve it.
       if (!response.ok) {
         unreachable();
         return;
@@ -184,7 +184,7 @@ export default function DeployPanel({
           <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <p className="font-semibold">A build szolgáltatás nem fut.</p>
             <p className="mt-1 text-xs">
-              Indítsd el egyszer a <code>deploy</code> profile-lal, utána megjelenik ez a gomb:
+              Indítsd el a stacket (a helper is a része), utána megjelenik ez a gomb:
             </p>
             <div className="mt-2 flex items-start gap-2">
               <code className="flex-1 overflow-x-auto rounded-lg bg-white px-3 py-2 text-xs">

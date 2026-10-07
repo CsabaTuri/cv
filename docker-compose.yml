@@ -273,11 +273,13 @@ services:
       - pma
 
   # ---------------------------------------------------------------------------
-  # deployer - the admin panel's one-click rebuild button. Opt-in: it only
-  # starts with the `deploy` profile and only acts when DEPLOY_ENABLED=true.
+  # deployer - the admin panel's one-click rebuild button.
   #
-  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  #     --profile deploy up -d
+  # It is part of the stack (no compose profile) so that every `up`, `down` or
+  # `--build` invocation covers it: a profiled service is left behind by the
+  # others, and a leftover container blocks the removal of the networks the
+  # other services share. The switch is DEPLOY_ENABLED: with `false` the helper
+  # serves status but refuses to start anything.
   #
   # It is the single container with access to the Docker socket, which is
   # root-equivalent on the host, so nothing else mounts it and the helper can
@@ -295,8 +297,6 @@ services:
     image: cv-deployer:${IMAGE_TAG_DEPLOYER:?IMAGE_TAG_DEPLOYER is missing from .env}
     container_name: cv_deployer
     restart: unless-stopped
-    profiles:
-      - deploy
     depends_on:
       chat-backend:
         condition: service_healthy
@@ -381,13 +381,15 @@ volumes:
 
 networks:
   # Application tier (site <-> API) and the network the stack publishes from.
-  # The subnet is fixed because the host routes it (keep it when renaming).
+  # The subnet is fixed on purpose: it stays out of Docker's default pool
+  # (172.17-172.31) and matches no route on the host, so nothing else can claim
+  # it. The gateway has to sit inside the subnet.
   app:
     driver: bridge
     ipam:
       config:
         - subnet: 172.33.255.0/24
-          gateway: "172.31.255.1"
+          gateway: "172.33.255.1"
 
   # Data tier: no internet egress, unreachable from outside the stack.
   data:
