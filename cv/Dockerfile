@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---------- Build stage ----------
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 WORKDIR /app
 
 ARG NEXT_PUBLIC_CLOUDFLARE_ANALYTICS_TOKEN
@@ -17,7 +17,7 @@ RUN npm run build
 # ---------- Runtime stage ----------
 # Unprivileged nginx: runs as uid 101 and listens on 8080, so the container
 # needs no root and no capabilities at all.
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.29-alpine
 COPY --chown=101:101 nginx-security-headers.conf /etc/nginx/security-headers.conf
 COPY --chown=101:101 nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder --chown=101:101 /app/out /usr/share/nginx/html
